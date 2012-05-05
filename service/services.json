@@ -1,0 +1,71 @@
+{
+    "id":"com.ericblade.synergy.service",
+    "description":"Synergy Service",
+    "engine":"node",
+    "activityTimeout":30,
+    "services" : [
+        { 
+	  "name":"com.ericblade.synergy.service",
+          "description": "Synergy Service",
+          "globalized": false,
+          "commands": [
+	      { "name":"checkCredentials",
+	        "assistant":"checkCredentials",
+			"public": true
+	      },
+	      { "name":"onCreate",
+	        "assistant": "onCreate",
+			"public": true
+	      },
+	      { "name": "onDelete",
+	        "assistant": "onDelete",
+			"public": true
+	      },
+	      { "name":"onCapabilitiesChanged",
+	        "assistant":"onCapabilitiesChanged",
+			"public": true
+	      },
+              { "name":"onEnabled",
+                "assistant":"onEnabled",
+                "public":true
+              },
+			  { "name": "sync",
+			    "assistant": "sync",
+				"public": true
+			  },
+              { "name":"onCredentialsChanged",
+                "assistant":"onCredentialsChanged",
+                "public": true
+              },
+              { "name": "loginStateChanged",
+                "assistant":"loginStateChanged",
+                "public": true
+              },
+              { "name": "sendIM",
+                "assistant":"sendIM",
+                "public": true
+              },
+              { "name": "sendCommand",
+                "assistant":"sendCommand",
+                "public": true
+              },
+			  { "name": "startActivity",
+			  "assistant": "startActivity",
+			  "public": true
+			  },
+			  { "name": "adoptActivity",
+			  "assistant": "adoptActivity",
+			  "public": true
+			  },
+			  { "name": "completeActivity",
+			  "assistant": "completeActivity",
+			  "public": true
+			  },
+			  { "name": "cancelActivity",
+			  "assistant": "cancelActivity",
+			  "public": true
+			  }
+          ]
+        }
+    ]
+}

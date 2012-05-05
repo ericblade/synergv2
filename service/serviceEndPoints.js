@@ -1,0 +1,510 @@
+// TODO: we need to disable/cancel our Activity at onEnable with enabled: false
+// TODO: probably also need to setup an activity that's name is based on the account name,
+//       so that we have one activity per account, and then it should be cake to
+//       know which account it wants us to work on.  Also, someone could have multiple
+//       accounts for a service, with only one of them enabled for messaging (if you have more than one capability)
+// TODO: I think I'd like to add a seperate file that actually handles the
+//       login/authenticate/retrieve messages/send messages stuff, and mostly just
+//       leave this file alone.
+
+// NOTE: There are a few service calls to the Palm ActivityManager service
+// in this source code, that are currently commented out.  I/We need to figure
+// out how to properly get the ActivityManager to work to make the most efficient
+// use of the database and built-in power saving functions of webOS.
+// At the moment, I have wired a simple 5-minute sync timer that should sync
+// incoming and outgoing messages at the same time.
+// Ideally, we want to have the service as idle as possible, so we want to just
+// wake it when a user actually inserts a message into the database.
+// Personally, I'm not sure exactly how IM services that need a persistent
+// connection are going to handle this, but hopefully we can come up with something
+// there.
+//
+// Also, there is a bug in this that does not show the account type inside the
+// messaging app's drop down status list.  I'm not certain, but I think that
+// may be due to the example account setup not having a CONTACTS connector.
+
+// Just a log to say we're present.  After installing the app/service, you can
+// run "run-js-service -k /media/cryptofs/apps/usr/palm/services/your.service.directory"
+// to see the actual output from the service.  That has been instrumental in helping me
+// to figure out what's going on in here.  As well as "ls-monitor" to watch the
+// service bus.
+console.log("Loading serviceEndPoints *****************************************************");
+
+// Called to test your credentials given - this is specified in the account-template.json, under "validator"
+// args = { "username": username entered, "password": password entered,
+//          "templateId": our template, "config": { ? } }
+// return a "credentials" object and a "config" object.  The "config" object will get passed to
+// the onCreate function when your account is created.
+//
+// Use this to go to your online service, and verify that the login information
+// given by the user works.  Return any credentials you will need to login to the
+// system again (ie username, password, service key, whatever), so that they will
+// be passed to onCreate, where you can save them.
+// Also called when credentials stop working, such as an expired access code, or
+// password change, and the user enters new information.
+
+checkCredentials = Class.create({
+	run: function(future) {
+		var args = this.controller.args;
+		console.log("checkCredentials", args.username, args.password);
+		future.result = {
+			returnValue: true,
+			credentials: {
+				common: {
+					password: args.password,
+					username: args.username
+				}
+			},
+			config: {
+				password: args.password,
+				username: args.username
+			}
+		}
+	}
+});
+
+// Called when your account is created from the Accounts settings, use this
+// function to create any account specific information.  In this example,
+// we're going to create a loginstate object, so the messaging app can see that
+// we do, in fact, exist.
+// specified in your account-template.json
+
+onCreate = Class.create({
+	run: function(future) {
+		var args = this.controller.args;
+		console.log("onCreate args=", JSON.stringify(args));
+
+		// Setup permissions on the database objects so that our app can read/write them.
+		// This is purely optional, and according to the docs here:
+		// https://developer.palm.com/content/api/dev-guide/synergy/creating-synergy-contacts-package.html
+		// You shouldn't even need to do this. I wasn't able to immediately get the file method to work though.
+
+		var permissions = [
+			{
+				type: "db.kind",
+				object: "com.ericblade.synergv.immessage:1",
+				caller: "com.ericblade.*",
+				operations: {
+					read: "allow", 
+					create: "allow",
+					"delete": "allow",
+					update: "allow"
+				}
+			},
+			{
+				type: "db.kind",
+				object: "com.ericblade.synergv.immessage:1",
+				caller: "com.palm.*",
+				operations: {
+					read: "allow",
+					create: "allow",
+					"delete": "allow",
+					update: "allow",
+				}
+			}
+		];
+
+		PalmCall.call("palm://com.palm.db/", "putPermissions", { permissions: permissions } ).then(function(fut)
+		{
+			console.log("permissions put result=", JSON.stringify(fut.result));
+			future.result = { returnValue: true, permissionsresult:fut.result };
+		});
+	}
+});
+
+// Called when your account is deleted from the Accounts settings, probably used
+// to delete your account info and any stored data
+
+onDelete = Class.create({
+	run: function(future) {
+		var args = this.controller.args;
+		console.log("onDelete", JSON.stringify(args));
+		DB.del({ from: "com.ericblade.synergv.loginstate:1" }).then(function(fut) {
+			future.result = f.result
+		});
+});
+
+var onCapabilitiesChanged = function(future) {};
+
+// Called when multiple capabilities are changed, instead of calling onEnabled several times
+// Only apparently useful if your service handles multiple Synergy capabilities
+
+onCapabilitiesChanged.prototype.run = function(future) {
+    console.log("onCapabilitiesChanged");
+}
+ 
+var onCredentialsChanged = function(future) {};
+
+// Called when user has entered new, validated credentials
+// Intended so that if you've been not syncing due to a credentials failure, then you'll know
+// that it should be good to go again
+
+onCredentialsChanged.prototype.run = function(future) { 
+    console.log("onCredentialsChanged"); 
+    future.result = { returnValue: true }; 
+};
+
+var loginStateChanged = function(future) {};
+
+// Included as part of the template.  You may want to set up a database watch
+// on your imstate objects, so you know when someone hits the "Offline" or
+// "online" toggle in the Messaging app, so that you can login/logout.
+loginStateChanged.prototype.run = function(future) {
+	console.log("loginStateChanged");
+	future.result = { returnValue: true };
+};
+
+var sendIM = function(future) {};
+
+// Included as part of the template.  You might want to fill this in with
+// your outgoing message code, to make it easy to call when needed.
+sendIM.prototype.run = function(future) {
+	console.log("sendIM");
+	future.result = { returnValue: true };
+};
+
+var sendCommand = function(future) {};
+
+// Included as part of the template.  You might want to fill this in with
+// any outgoing command code, to make it easy to call when needed.
+sendCommand.prototype.run = function(future) {
+	console.log("sendIM");
+	future.result = { returnValue: true };
+};
+
+//*****************************************************************************
+// Capability enabled notification - called when capability enabled or disabled
+//*****************************************************************************
+var onEnabled = function(future){};
+
+//
+// Synergy service got 'onEnabled' message. When enabled, a sync should be started and future syncs scheduled.
+// Otherwise, syncing should be disabled and associated data deleted.
+// Account-wide configuration should remain and only be deleted when onDelete is called.
+// onEnabled args should be like { accountId: "++Mhsdkfj", enabled: true }
+// 
+
+onEnabled.prototype.run = function(future) {  
+    var args = this.controller.args;
+
+    console.log("onEnabledAssistant args.enabled=", args.enabled);
+	
+	if(!args.enabled)
+	{
+		// cancel our sync activity, and remove the entry from the messaging loginstates,
+		// so we no longer show up in the app
+		var stopSync = PalmCall.call("palm://com.ericblade.synergv.service/", "cancelActivity", { accountId: args.accountId }).then(function(f) {
+			DB.del({ from: "com.ericblade.synergv.loginstate:1" });
+		});
+	}
+	else
+	{
+		// Create an object to insert into the database, so that the messaging app
+		// knows that we exist.
+		var loginStateRec = {
+			"objects":[
+			{
+				_kind: "com.ericblade.synergv.loginstate:1",
+				// TODO: we should pull this from the account template.. how?
+				serviceName: "type_synergv",
+				accountId: args.accountId,
+				username: "blade.eric", 
+				state: "online", // it doesn't -seem- to matter what i put here, there may be another parameter involved
+				availability: 1
+			}]
+		};
+
+		// And then start an Activity to organize our syncing		
+		
+		PalmCall.call("palm://com.palm.db/", "put", loginStateRec).then( function(f) {
+			var startSync = PalmCall.call("palm://com.palm.activitymanager/", "create",
+			{
+				start: true,
+				activity: {
+					name: "SynerGVOutgoingSync:" + args.accountId,
+					description: "SynerGV Pending Messages Watch",
+					type: {
+						foreground: true,
+						power: true,
+						powerDebounce: true,
+						explicit: true,
+						persist: true
+					},
+					requirements: {
+						internet: true
+					},
+					trigger: {
+						method: "palm://com.palm.db/watch",
+						key: "fired",
+						params: {
+							subscribe: true,
+							query: {
+								from: "com.ericblade.synergv.immessage:1",
+								where: [
+									{ prop: "status", op: "=", val: "pending" },
+									{ prop: "folder", op: "=", val: "outbox" },
+									// TODO: Grab the username from somewhere, and insert it here
+									/*{ prop: "serviceName", op: "=", val: "type_synergv" },
+									{ prop: "userName", op: "=", val: TODO GET USERNAME FROM SOMEWHERE },*/
+								],
+								limit: 1
+							}
+						}
+					},
+					callback: {
+						method: "palm://com.ericblade.synergv.service/sync",
+						params: {}
+					}
+				}
+			});
+		});
+	}
+					  
+	(args.enabled ? startSync : stopSync).then(function(activityFuture) {
+			console.log("activityFuture", (args.enabled ? "start" : "stop"), " result=", JSON.stringify(activityFuture.result));
+			future.result = { returnValue: true };
+	});
+};
+
+
+// Here's some possibly not well known things about the services that I'm learning while attempting to read the
+// service code itself (which is in Javascript, but without knowing it's intentions, it's quite difficult to read
+// for my skill level)
+//
+// The command assistants appear to be instances of Prototype js lib Classes.
+// You should be able to do something like
+//
+// runCommandAssistant = Class.create({ run: ..., complete: ... })
+//
+// This would make it a lot more enyo-like in structure.
+//
+// Available functions that the service appears to call inside a class:
+//
+// setup - called before running a command (we should try to adopt a thing here, perhaps)
+// commandTimeout - not a function, but apparently you can set the timeout for individual commands by setting a commandTimeout
+//                  variable.  This will override the command's configured timeout or the service as a whole's timeout
+// timeoutReceived - called when a command has reached it's timeout
+// complete - called when a command run is completed
+// cleanup - called after complete
+// yield - called when a "yield" Event happens, whatever that means
+// cancelSubscription - presumably called when a subscription is cancelled
+
+// The "sync" assistant is normally called from the CONTACTS "Sync Now" button.
+// This doesn't seem to be the case when a MESSAGING connector is added, but we're going
+// to use this to fire off a database watch.  If you're going to be retrieving data from the
+// internet (presumably!) you probably want to add a call to the Alarm function, so that you
+// can get a wake up alert here.
+// Keep in mind that Synergy can create multiple accounts of one type, so you probably want to dig up
+// all possible accountinfos, and sync them all.
+
+// TODO: Add support to the test app to inject accountId here
+
+var startActivity = Class.create({
+	run: function(activityFuture)
+	{
+		var args = this.controller.args;
+		PalmCall.call("palm://com.palm.activitymanager/", "create",
+		{
+		start: true,
+		activity: {
+			name: "SynerGVOutgoingSync:" + args.accountId,
+			description: "SynerGV Pending Messages Watch",
+			type: {
+				foreground: true,
+				power: true,
+				powerDebounce: true,
+				explicit: true,
+				persist: true
+			},
+			requirements: {
+				internet: true
+			},
+			trigger: {
+				method: "palm://com.palm.db/watch",
+				key: "fired",
+				params: {
+					subscribe: true,
+					query: {
+						from: "com.ericblade.synergv.immessage:1",
+						where: [
+							{ prop: "status", op: "=", val: "pending" },
+							{ prop: "folder", op: "=", val: "outbox" }
+						],
+						limit: 1
+					}
+				}
+			},
+			callback: {
+				method: "palm://com.ericblade.synergv.service/sync",
+				params: {}
+			}
+		}
+		}).then(function(f) {
+			console.log("startActivity result=", JSON.stringify(f.result));
+			activityFuture.result = f.result;
+		});
+	}
+});
+
+var adoptActivity = Class.create({
+	run: function(adoptFuture)
+	{
+		var args = this.controller.args;
+		PalmCall.call("palm://com.palm.activitymanager/", "adopt", {
+			activityName: "SynerGVOutgoingSync:" + args.accountId,
+			wait: true,
+			subscribe: true
+		}).then(function(f) {
+			console.log("adoptActivity result", JSON.stringify(f.result));
+			adoptFuture.result = f.result;
+		});
+	}
+});
+
+var completeActivity = Class.create({
+	run: function(completeFuture)
+	{
+		var args = this.controller.args;
+		PalmCall.call("palm://com.palm.activitymanager/", "complete", {
+			activityName: "SynerGVOutgoingSync:" + args.accountId,
+			restart: true,
+			// the docs say you shouldn't need to specify the trigger and callback conditions again, i think..
+			// someone else said reset the callback to a different function .. to avoid the "Temporarily Not Available" problem
+			// other people say you do. so let's try it.
+			trigger: {
+			  key: "fired",
+			  method: "palm://com.palm.db/watch",		  
+			  params: {
+				  query: {
+					  from: "com.ericblade.synergv.immessage:1",
+					  where:
+					  [
+						  { "prop":"folder", "op":"=", "val":"outbox" },
+						  { "prop":"status", "op":"=", "val":"pending" }, 
+					  ]
+				  },
+				  subscribe: true
+			  },
+			}
+		}).then(function(f) {
+			console.log("completeActivity result", JSON.stringify(f.result));
+			completeFuture.result = f.result;
+		});
+	}
+});
+
+var cancelActivity = Class.create({
+	run: function(cancelFuture)
+	{
+		var args = this.controller.args;
+		PalmCall.call("palm://com.palm.activitymanager/", "cancel", {
+			activityName: "SynerGVOutgoingSync:" + args.accountId
+		}).then(function(f) {
+			cancelFuture.result = f.result;
+		});
+	}
+})
+
+var sync = Class.create({
+	setup: function() {
+		var args = this.controller.args;
+		var future;
+		console.log("sync setup start");
+		/*var activity = args.$activity;
+		if(activity) {
+		    var activityId = activity.activityId;		
+			var future = PalmCall.call("palm://com.palm.activitymanager/", "adopt", {
+				activityName: "SynerGVOutgoingSync",
+				wait: true
+			}).then(function(f) {
+				console.log("sync setup complete", JSON.stringify(f.result));
+				future.result = { returnValue: true };
+				f.result = { returnValue: true };
+			});
+		} */
+		return future;
+	},
+	run: function(syncFuture) {
+		var args = this.controller.args;
+		console.log("sync run start");
+		var f = new Future();
+		var query = {
+					  from: "com.ericblade.synergv.immessage:1",
+					  where:
+					  [
+						  { "prop":"folder", "op":"=", "val":"outbox" },
+						  { "prop":"status", "op":"=", "val":"pending" },
+						  // TODO: add serviceName and userName to this query
+					  ]
+				  };
+
+		f.now(function(future) {
+			console.log("setting alarm");
+			f.nest(PalmCall.call("palm://com.palm.power/timeout/", "set", {
+				key: "com.ericblade.synergv.synctimer",
+				"in": "00:05:00",
+				uri: "palm://com.ericblade.synergv.service/sync",
+				params: "{}"
+			}).then(function(postAlarmFuture) {
+				console.log("alarm set result", JSON.stringify(postAlarmFuture.result));			
+			}));
+			future.nest(DB.find(query, false, false).then(function(dbFuture) {
+				console.log("dbFuture result=", JSON.stringify(dbFuture.result));
+				var dbResult = dbFuture.result;
+				if(dbResult.results)
+				{
+					var mergeIDs = [ ];
+					// Call our sendIM service function to actually send each message
+					// Record each message ID into an array, and then update them in
+					// the database as "successful", ie - sent.
+					// You may want to not mark them as sent in the database until they
+					// are actually sent via your sendIM function, though.
+					for(var x = 0; x < dbResult.results.length; x++)
+					{
+						console.log("Merging status of ", dbResult.results[x]["_id"]);
+						PalmCall.call("palm://com.ericblade.synergv.service/", "sendIM", {
+							to: dbResult.results[x].to[0].addr,
+							text: dbResult.results[x].messageText
+						});
+						mergeIDs.push( { "_id": dbResult.results[x]["_id"], "status": "successful" });
+					}
+					DB.merge(mergeIDs);
+				}
+				syncFuture.result = { returnValue: true };
+			}));
+		});
+	},
+	complete: function() {
+		var args = this.controller.args;
+		var activity = args.$activity;
+		console.log("sync complete starting");
+		return activity && PalmCall.call("palm://com.palm.activitymanager/", "complete", {
+			//activityName: "SynerGVOutgoingSync",
+			activityId: activity.activityId,
+			restart: true,
+			// the docs say you shouldn't need to specify the trigger and callback conditions again, i think..
+			// someone else said reset the callback to a different function .. to avoid the "Temporarily Not Available" problem
+			// other people say you do. so let's try it.
+			trigger: {
+			  key: "fired",
+			  method: "palm://com.palm.db/watch",		  
+			  params: {
+				  query: {
+					  from: "com.ericblade.synergv.immessage:1",
+					  where:
+					  [
+						  { "prop":"folder", "op":"=", "val":"outbox" },
+						  { "prop":"status", "op":"=", "val":"pending" },
+						  // TODO: add serviceName and userName here
+					  ],
+					  limit: 1
+				  },
+				  subscribe: true
+			  },
+			}
+		}).then(function(f) {
+			console.log("sync complete completed", JSON.stringify(f.result));
+			f.result = { returnValue: true };
+		})
+	}	
+})
