@@ -1,12 +1,12 @@
 {
-    "id":"com.ericblade.synergy.service",
-    "description":"Synergy Service",
+    "id":"com.ericblade.synergv.service",
+    "description":"SynerGV Service",
     "engine":"node",
     "activityTimeout":30,
     "services" : [
         { 
-	  "name":"com.ericblade.synergy.service",
-          "description": "Synergy Service",
+	  "name":"com.ericblade.synergv.service",
+          "description": "SynerGV Service",
           "globalized": false,
           "commands": [
 	      { "name":"checkCredentials",
@@ -63,6 +63,10 @@
 			  },
 			  { "name": "cancelActivity",
 			  "assistant": "cancelActivity",
+			  "public": true
+			  },
+			  { "name": "storeMsg",
+			  "assistant": "storeMsg",
 			  "public": true
 			  }
           ]

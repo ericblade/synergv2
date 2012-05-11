@@ -1,6 +1,6 @@
 {
     "templateId"            : "com.ericblade.synergv.account",
-    "loc_name"              : "Synergy Messaging",
+    "loc_name"              : "SynerGV Google Voice",
     "hidden"                : false,
     "invisible"             : false,
     "icon"                  : { "loc_32x32": "images/gvoice32.png", "loc_48x48": "images/gvoice48.png", "splitter": "images/gvoice32.png" },
@@ -8,11 +8,18 @@
     "writePermissions"      : [ "com.ericblade.synergv", "com.palm.app.messaging", "com.palm.app.phone" ],
     "validator"		    : "palm://com.ericblade.synergv.service/checkCredentials",
     "capabilityProviders"   : [
-                                { "id":"com.ericblade.synergv.account.im",
+                               { "id":"com.ericblade.synergv.account.contacts",
+                                  "capability": "CONTACTS",
+                                  "sync": "palm://com.ericblade.synergv.service/sync",
+                                  "dbkinds": {
+                                      "contact": "com.palm.contact.palmprofile:1"
+                                  }
+                                },
+                                 { "id":"com.ericblade.synergv.account.im",
                                   "alwaysOn": false,
                                   "sync": "palm://com.ericblade.synergv.service/sync",
-                                  "loc_name": "Google Voice",
-                                  "loc_shortName": "GVoice",
+                                  "loc_name": "SynerGV SMS",
+                                  "loc_shortName": "GoogleVoice",
                                   "capability":"MESSAGING",
                                   "capabilitySubtype": "IM",
                                   "serviceName":"type_synergv",
@@ -37,3 +44,5 @@
                                 }
                                ]
 }
+
+
