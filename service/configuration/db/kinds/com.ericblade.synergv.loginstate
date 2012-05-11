@@ -1,0 +1,14 @@
+{
+    "id": "com.ericblade.synergv.loginstate:1",
+    "owner": "com.ericblade.synergv.service",
+    "sync": true,
+    "indexes": [
+        {
+            "name": "byAccountId",
+            "props": [
+                { "name": "accountId" }
+            ]
+        }
+    ],
+    "extends": [ "com.palm.imloginstate:1" ]
+}

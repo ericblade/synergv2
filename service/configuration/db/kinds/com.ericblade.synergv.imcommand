@@ -1,0 +1,6 @@
+{
+    "id": "com.ericblade.synergv.imcommand:1",
+    "owner": "com.ericblade.synergv.service",
+    "sync": true,
+    "extends": [ "com.palm.imcommand:1" ]
+}
