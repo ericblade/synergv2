@@ -1,68 +1,90 @@
-// TODO: Need to not clear the pending messages until they are actually sent, on the off chance internet is flaky.
-// perhaps should add a confidence level to our internet watch? maybe not.
+var ServiceResponseLogging = true;
+
+// TODO: it might be possible that just replacing the https event emitter with something that looks vaguely like it in
+//		node_modules/googleclientlogin/index.js might get us running on webOS 2. . . 
+// TODO: why does getSettings sometimes take .. damn near forever .. to return?
+// TODO: we can "syncAllAccounts" now, why don't we just set that up to run on the timer, instead of an individual sync per account?
+// TODO: how can we sync contacts added from the webOS app back to google?
+// TODO: If sync() returned it's messages, we could use sync() instead of getVoiceMessages() in the app, and then it would automatically sync the messaging app .. ?
+// TODO: all the "var data = JSON.parse()" lines could fail if the error is, for example, an argument error, that never went to the server, must clean up
+// TODO: should also validate all of those error handlers, setMessageFlag() seems to do it right, the others might not
+
+// Does deleting an account delete contacts??
+// TODO: need to make sure that we have our outgoing and incoming sync activities still in the
+//       system, somewhere that will be called regularly..
+// (for determining actual account to send from when we receive an outgoing message from the database):
+// run a query where conversation == the conversationID of the outgoing message, and
+// to.addr == [ array of account names that could be possible ], order by most recent, limit 1,
+// and if a result shows up, use that instead of the one supplied by messaging
+//
+// TODO: Maybe we should store one of the English timestamps into the Database, to ease Just Type display..
+// TODO: i'm seeing duplciate "auth details" logs, it should be caching those for later runs during the same service execution?
+// TODO: need to make sure we don't blow up on "missed call" and "placed call"
+// TODO: need to see what happens when we record a call 
+// TODO: need to add an interface somehow to args.markMessagesRead in sync, default it to true ..
+// TODO: need to add an interface somehow to args.storeOwn in storeConversation, default it to false?
+// TODO: look into Activities library at :
+//		/usr/palm/frameworks/foundations/submission/108/javascript/control#
+// TODO: can we monitor the immessage database on flags.read and see when the messaging app marks
+//		a message read?
+//    can we then use that to know when to mark a conversation read on the server?
+
+// TODO: need to have onEnabled (false) delete all traces of our existence except for the actual
+//		account data
+//  (delete from com.ericblade.synergv.loginstate, .contact, .immessage, .imcommand, remove all
+//		watches and alarms)
+// TODO: investigate what happens if we don't even put in the loginstate, or what happens if we
+//		watch on the loginstate and reset it to "online"/4 or "offline"/4
+// TODO: pretty-print phone numbers anywhere we put them into a database (i believe we do this in
+//		the gvoice app already)
+// TODO: explore seperating people's names into presumably first/middle/lasts before dropping them
+//		into the contacts database
+
+require.paths.push("./");
+require.paths.push("./node_modules");
+require.paths.push("./node_modules/jsdom");
+require.paths.push("./node_modules/jsdom/lib");
+require.paths.push("./node_modules/jsdom/node_modules");
+
 var fs = require('fs');
 var servicePath = fs.realpathSync('.');
 var modulePath = servicePath + '/node_modules';
-//var GV = require(servicePath + '/node_modules/google-voice/');
 var GV = require(modulePath + '/google-voice/google-voice.js');
-//var WebSocket = require(servicePath + '/node_modules/websocket-client').WebSocket;
 
-/*var ws = new WebSocket('ws://node.remysharp.com:8001');
-ws.addListener('data', function(buf) {
-	console.log("ws rec:", buf);
-});
-ws.onmessage = function(m) {
-	console.log("ws msg:", m);
-}*/
-//ws.send('{ "access_token": "asdfasdfasdfasdf" }');
+var https;
+try {
+    https = require('https');
+} catch(err) {
+    // leave https undefined
+}
+
 // TODO: we need to disable/cancel our Activity at onEnable with enabled: false
-// TODO: probably also need to setup an activity that's name is based on the account name,
-//       so that we have one activity per account, and then it should be cake to
-//       know which account it wants us to work on.  Also, someone could have multiple
-//       accounts for a service, with only one of them enabled for messaging (if you have more than one capability)
-// TODO: I think I'd like to add a seperate file that actually handles the
-//       login/authenticate/retrieve messages/send messages stuff, and mostly just
-//       leave this file alone.
 
-// NOTE: There are a few service calls to the Palm ActivityManager service
-// in this source code, that are currently commented out.  I/We need to figure
-// out how to properly get the ActivityManager to work to make the most efficient
-// use of the database and built-in power saving functions of webOS.
-// At the moment, I have wired a simple 5-minute sync timer that should sync
-// incoming and outgoing messages at the same time.
-// Ideally, we want to have the service as idle as possible, so we want to just
-// wake it when a user actually inserts a message into the database.
-// Personally, I'm not sure exactly how IM services that need a persistent
-// connection are going to handle this, but hopefully we can come up with something
-// there.
-//
-// Also, there is a bug in this that does not show the account type inside the
-// messaging app's drop down status list.  I'm not certain, but I think that
-// may be due to the example account setup not having a CONTACTS connector.
-
-// Just a log to say we're present.  After installing the app/service, you can
-// run "run-js-service -k /media/cryptofs/apps/usr/palm/services/your.service.directory"
-// to see the actual output from the service.  That has been instrumental in helping me
-// to figure out what's going on in here.  As well as "ls-monitor" to watch the
-// service bus.
 console.log("Loading serviceEndPoints *****************************************************");
 
-// Called to test your credentials given - this is specified in the account-template.json, under "validator"
-// args = { "username": username entered, "password": password entered,
-//          "templateId": our template, "config": { ? } }
-// return a "credentials" object and a "config" object.  The "config" object will get passed to
-// the onCreate function when your account is created.
-//
-// Use this to go to your online service, and verify that the login information
-// given by the user works.  Return any credentials you will need to login to the
-// system again (ie username, password, service key, whatever), so that they will
-// be passed to onCreate, where you can save them.
-// Also called when credentials stop working, such as an expired access code, or
-// password change, and the user enters new information.
-
+getVoiceMessages = Class.create({
+	run: function(future) {
+		var args = this.controller.args;
+		var assistant = this.controller.service.assistant;
+		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
+			var GVclient = f.result.client;
+			var start = ( ((args.page || 1) - 1) * 10) + 1;
+			GVclient.get(args.inbox || 'inbox', { start: start, limit: 10 }, function(error, response) {
+				if(error)
+				    future.result = { returnValue: false, error: error };
+				else
+					future.result = { returnValue: true, messages: response.messages, total: response.total, resultsPerPage: response.resultsPerPage };
+				fs.writeFileSync("/media/internal/gvmessages.json", JSON.stringify(future.result));
+			});
+		}));
+		return future;
+	}
+});
+					
 checkCredentials = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
+		var assistant = this.controller.service.assistant;
 		console.log("checkCredentials", args.username, args.password);
 		
 		var GVclient = new GV.Client({ email: args.username, password: args.password });
@@ -72,34 +94,40 @@ checkCredentials = Class.create({
 				if(error) {
 					// error.code = 10 message=GOOGLE_CLIENTLOGIN_ERROR - incorrect userid/password
 					// error.code = 11 message=REQUEST_ERROR - wifi off					
-					console.log("error retrieving inbox " + JSON.stringify(error));
+					console.log("error retrieving rnrse " + JSON.stringify(error));
 					switch(error.code) {
+						case 2: error.code = "CONNECTION_FAILED"; break; // GET_RNRSE_ERROR
 						case 10: error.code = "401_UNAUTHORIZED"; break;
 						case 11: error.code = "CONNECTION_FAILED"; break;
 						default: error.code = "UNKNOWN_ERROR"; break;
 					}
 					future.setException(Foundations.Err.create(error.code, error.message));
-					future.result = { returnValue: false, errorCode: error.code, errorText: error.message };
+					future.result = {
+						returnValue: false,
+						errorCode: error.code,
+						errorText: error.message
+					};
 				} else {
 					console.log("RNRSE received");
-					future.result = { returnValue: true, 
-										credentials:
-										{
-											common:
-											{
-												password: args.password,
-												auth: GVclient.auth.getAuthId(),
-												rnrse: GVclient.config.rnr_se,
-											},
-										},
-										config:
-										{
-											username: args.username,
-											password: args.password,
-											auth: GVclient.auth.getAuthId(),
-											rnrse: GVclient.config.rnr_se
-										}
-									};
+					future.result = {
+						returnValue: true, 
+						credentials:
+						{
+							common:
+							{
+								password: args.password,
+								auth: GVclient.auth.getAuthId(),
+								rnrse: GVclient.config.rnr_se,
+							},
+						},
+						config:
+						{
+							username: args.username,
+							password: args.password,
+							auth: GVclient.auth.getAuthId(),
+							rnrse: GVclient.config.rnr_se
+						}
+					};
 				}
 			});
 		}).then(function(fut) {
@@ -114,11 +142,25 @@ checkCredentials = Class.create({
 	}
 });
 
-// Called when your account is created from the Accounts settings, use this
-// function to create any account specific information.  In this example,
-// we're going to create a loginstate object, so the messaging app can see that
-// we do, in fact, exist.
-// specified in your account-template.json
+getAccounts = Class.create({
+	run: function(future) {
+		var dbQuery = {
+			select: [ "accountId" ],
+			from: "com.ericblade.synergv.configuration:1",
+		};
+		future.nest(DB.find(dbQuery, false, false).then(function(f) {
+			var dbResults = f.result.results;
+			var ret = [ ];
+			for(var x = 0; x < dbResults.length; x++) {
+				ret.push(dbResults[x].accountId);
+			}
+			if(ServiceResponseLogging)
+				console.log(" results=" + JSON.stringify(ret));
+			
+			future.result = { returnValue: true, accounts: ret };
+		}));
+	}
+})
 
 onCreate = Class.create({
 	run: function(future) {
@@ -128,8 +170,16 @@ onCreate = Class.create({
 		// Setup permissions on the database objects so that our app can read/write them.
 		// This is purely optional, and according to the docs here:
 		// https://developer.palm.com/content/api/dev-guide/synergy/creating-synergy-contacts-package.html
-		// You shouldn't even need to do this. I wasn't able to immediately get the file method to work though.
-
+		// You shouldn't even need to do this. I wasn't able to immediately get the file method
+		//	to work though.
+		var accountstore = {
+			objects: [{
+				_kind: "com.ericblade.synergv.configuration:1",
+				accountId: args.accountId
+			}]
+		};
+		PalmCall.call("palm://com.palm.db/", "put", accountstore);
+		
 		var permissions = [
 			{
 				type: "db.kind",
@@ -189,18 +239,34 @@ onCreate = Class.create({
 	}
 });
 
-// Called when your account is deleted from the Accounts settings, probably used
-// to delete your account info and any stored data
+// TODO: Make sure this deletes any stored data, IMs, and stuff.
+// actually, all the removal is supposed to happen when disabling, according to the palm docs
 
 onDelete = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
 		console.log("onDelete", JSON.stringify(args));
 		if(args.accountId !== undefined) {
-			PalmCall.call("palm://com.palm.keymanager/", "remove", { keyname: "GVUsername:" + args.accountId });
-			PalmCall.call("palm://com.palm.keymanager/", "remove", { keyname: "GVPassword:" + args.accountId });
-			PalmCall.call("palm://com.palm.keymanager/", "remove", { keyname: "GVAuth:" + args.accountId });
-			PalmCall.call("palm://com.palm.keymanager/", "remove", { keyname: "GVRNRSE:" + args.accountId });
+			PalmCall.call("palm://com.palm.keymanager/", "remove",
+						  { keyname: "GVUsername:" + args.accountId });
+			PalmCall.call("palm://com.palm.keymanager/", "remove",
+						  { keyname: "GVPassword:" + args.accountId });
+			PalmCall.call("palm://com.palm.keymanager/", "remove",
+						  { keyname: "GVAuth:" + args.accountId });
+			PalmCall.call("palm://com.palm.keymanager/", "remove",
+						  { keyname: "GVRNRSE:" + args.accountId });
+			PalmCall.call("palm://com.palm.db/", "del",
+						  {
+							query: {
+								from: "com.ericblade.synergv.configuration:1",
+								"where": [
+										  {
+											prop:"accountId",
+											op: "=",
+											val: args.accountId
+										}]
+							}
+						  });
 		}
 		DB.del({ from: "com.ericblade.synergv.loginstate:1" }).then(function(fut) {
 			future.result = fut.result
@@ -213,6 +279,7 @@ var onCapabilitiesChanged = function(future) {};
 // Called when multiple capabilities are changed, instead of calling onEnabled several times
 // Only apparently useful if your service handles multiple Synergy capabilities
 
+// TODO: we should probably implement this
 onCapabilitiesChanged.prototype.run = function(future) {
     console.log("onCapabilitiesChanged");
 }
@@ -238,8 +305,6 @@ loginStateChanged.prototype.run = function(future) {
 	future.result = { returnValue: true };
 };
 
-var sendIM = function(future) {};
-
 // Included as part of the template.  You might want to fill this in with
 // your outgoing message code, to make it easy to call when needed.
 var sendIM = Class.create({
@@ -248,18 +313,39 @@ var sendIM = Class.create({
 		var assistant = this.controller.service.assistant;
 		console.log("sendIM", JSON.stringify(args));
 		
-		assistant.GVclient.connect('sms', { outgoingNumber: args.to, text: args.text }, function(error, response, body) {
-			var data = JSON.parse(body);
-			if(error || !data.ok) {
-				console.log("Error", error, "body", body);
-				future.result = { returnValue: false };
-			} else {
-				console.log("Message sent");
-				future.result = { returnValue: true };
-			}
-		});		
+		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
+			console.log("sending with client ", JSON.stringify(f.result.client));
+			var client = f.result.client;
+			client.connect('sms', {
+				outgoingNumber: args.to,
+				text: args.text
+			}, function(error, response, body) {
+				var data = JSON.parse(body);
+				var status = "permanent-fail";
+				var errormsg = "";
+				if(error || !data.ok) {
+					console.log("Error: ", error);
+					console.log("body: ", body);
+					console.log("data.ok: ", data.ok);
+					console.log("data.code: ", data.data.code);
+					switch(data.data.code) {
+						case 20: errormsg = "Invalid Number"; break;
+						case 58: errormsg = "SMS limit reached. Try again later, or send to fewer recipients."; break;
+						case 66: errormsg = "Out of credit."; break;
+						case 67: errormsg = "Destination not supported."; break;
+						default: errormsg = "Unknown error code, please report this error and it's circumstances to blade.eric@gmail.com , thank you."; break;
+					}
+					future.result = { destination: args.to, status: status,
+										errorcode: data.data.code, errormsg: errormsg,
+										msgId: args.msgId, returnValue: true };
+				} else {
+					console.log("Message sent");
+					future.result = { status: "successful", msgId: args.msgId, returnValue: true };
+				}
+			});
+		}));
 	},
-	setup: function() {
+	/*setup: function() {
 		var args = this.controller.args;
 		var assistant = this.controller.service.assistant;
 		var future = new Future;
@@ -267,66 +353,34 @@ var sendIM = Class.create({
 		var password = "";
 		var auth = "";
 		var rnrse = "";
-		
+
 		if(!assistant.GVclient)
 		{
 			console.log("sendIM was not able to locate a GVclient");
-			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVAuth:" + args.accountId }).then(function(f) {
+			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey",
+									  { "keyname": "GVAuth:" + args.accountId }).then(function(f) {
 				auth = Base64.decode(f.result.keydata);
 			}));
-			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVRNRSE:" + args.accountId }).then(function(f) {
+			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey",
+									  { "keyname": "GVRNRSE:" + args.accountId }).then(function(f) {
 				rnrse = Base64.decode(f.result.keydata);
 			}));
-			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVUsername:" + args.accountId }).then(function(f) {
+			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey",
+									  { "keyname": "GVUsername:" + args.accountId }).then(function(f) {
 				username = Base64.decode(f.result.keydata);
 			}));
-			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVPassword:" + args.accountId }).then(function(f) {
+			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey",
+									  { "keyname": "GVPassword:" + args.accountId }).then(function(f) {
 				password = Base64.decode(f.result.keydata);
 				console.log("auth details: ", username, password, rnrse, auth);
 				assistant.GVclient = new GV.Client({ email: username, password: password, rnr_se: rnrse, authToken: auth });
 				future.result = { returnValue: true };
 			}));
-/*			future.now(function() {
-				PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVAuth:" + args.accountId}).then(function(authF)
-				{
-					if(authF.result.returnValue === true)
-					{
-						auth = Base64.decode(authF.result.keydata);
-						console.log("pulled auth", auth);
-						PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVRNRSE:" + args.accountId}).then(function(rnrF)
-						{
-							if(rnrF.result.returnValue === true) {
-								rnrse = Base64.decode(rnrF.result.keydata);
-								console.log("pulled rnr", rnrse);
-							}
-							PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname" : "GVUsername:" + args.accountId }).then(function(f)
-							{
-								if(f.result.returnValue === true) {
-									username = Base64.decode(f.result.keydata);
-									console.log("pulled username", username);
-									PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVPassword:" + args.accountId }).then(function(f1) {
-										if(f1.result.returnValue === true) {
-											password = Base64.decode(f1.result.keydata);
-											console.log("pulled password", password);
-											assistant.GVclient = new GV.Client({ email: username, password: password, rnr_se: rnrse, authToken: auth });
-											future.result = { returnValue: true };
-										} else {
-											future.result = { returnValue: false };
-										}
-									});
-								} else {
-									future.result = { returnValue: false };
-								}
-							});
-						});
-					}
-				});
-			});*/
 		} else {
 			future.result = { returnValue: true };
 		}
 		return future;
-	}
+	}*/
 });
 
 var sendCommand = function(future) {};
@@ -338,179 +392,124 @@ sendCommand.prototype.run = function(future) {
 	future.result = { returnValue: true };
 };
 
-//*****************************************************************************
-// Capability enabled notification - called when capability enabled or disabled
-//*****************************************************************************
-var onEnabled = function(future){};
-
-//
-// Synergy service got 'onEnabled' message. When enabled, a sync should be started and future syncs scheduled.
-// Otherwise, syncing should be disabled and associated data deleted.
-// Account-wide configuration should remain and only be deleted when onDelete is called.
-// onEnabled args should be like { accountId: "++Mhsdkfj", enabled: true }
-// 
-
-onEnabled.prototype.run = function(future) {  
-    var args = this.controller.args;
-
-    console.log("onEnabledAssistant args=", JSON.stringify(args));
-	
-	if(!args.accountId) return;
-	
-	if(!args.enabled)
-	{
-		// cancel our sync activity, and remove the entry from the messaging loginstates,
-		// so we no longer show up in the app
-		future.nest(PalmCall.call("palm://com.palm.activitymanager/", "stop", { activityName: "SynerGVOutgoingSync:" + args.accountId }).then(function(f) {
-			console.log("outgoing sync stop result=", JSON.stringify(f.result));
-		}));
-		future.nest(PalmCall.call("palm://com.palm.power/timeout/", "clear", { key: "SynerGVsync:" + args.accountId }).then(function(f) {
-			console.log("incoming sync stop result=", JSON.stringify(f.result));
-		}));
-		future.nest(DB.del({ from: "com.ericblade.synergv.loginstate:1", where: [ { prop: "accountId", op: "=", val: args.accountId } ] }).then(function(f) {
-			console.log("loginstate db removal result=", JSON.stringify(f.result));
-			future.result = { returnValue: true };
-		}));
+onEnabled = Class.create({
+	run: function(future) {
+		var args = this.controller.args;
+		console.log("onEnabled args=", JSON.stringify(args));
+		
+		if(!args.accountId) {
+			future.result = { returnValue: false };
+			return;
+		}
+		if(args.enabled === false) {
+			PalmCall.call("palm://com.palm.service.accounts/", "getAccountInfo", { accountId: args.accountId }).then(function(accountFut) {
+				console.log("Disabling account", accountFut.result.result.username);
+				future.nest(PalmCall.call("palm://com.palm.activitymanager/", "stop", { activityName: "SynerGVOutgoingSync:" + args.accountId }).then(function(f) {
+					console.log("outgoing sync stop result=", JSON.stringify(f.result));
+				}));
+				future.nest(PalmCall.call("palm://com.palm.power/timeout/", "clear", { key: "SynerGVsync:" + args.accountId }).then(function(f) {
+					console.log("incoming sync stop result=", JSON.stringify(f.result));
+				}));
+				future.nest(DB.del({ from: "com.ericblade.synergv.contact:1", where: [ { prop: "accountId", op: "=", val: args.accountId } ] }).then(function(f) {
+					console.log("contact removal result=", JSON.stringify(f.result));
+				}));
+				future.nest(DB.del({ from: "com.ericblade.synergv.imcommand:1", where: [ { prop: "accountId", op: "=", val: args.accountId } ] }).then(function(f) {
+					console.log("imcommand removal result=", JSON.stringify(f.result));
+				}));
+				future.nest(DB.del({ from: "com.ericblade.synergv.immessage:1", where: [ { prop: "accountId", op: "=", val: args.accountId } ] }).then(function(f) {
+					console.log("immessage removal result=", JSON.stringify(f.result));
+				}));
+				future.nest(DB.del({ from: "com.ericblade.synergv.loginstate:1", where: [ { prop: "accountId", op: "=", val: args.accountId } ] }).then(function(f) {
+					console.log("loginstate db removal result=", JSON.stringify(f.result));
+					f.result = future.result = { returnValue: true };
+				}));
+			});
+		} else if(args.enabled === true) {
+			future.nest(PalmCall.call("palm://com.palm.service.accounts/", "getAccountInfo", { accountId: args.accountId }).then(function(f) {
+				var accountInfo = f.result.result;
+				console.log("***** getAccountInfo returned", JSON.stringify(accountInfo));
+				var serviceName = "";
+				for(var x = 0; x < accountInfo.capabilityProviders.length; x++) {
+					if(accountInfo.capabilityProviders[x].capability == "MESSAGING") {
+						serviceName = accountInfo.capabilityProviders[x].serviceName;
+					}
+				}
+				console.log("*** loginStateRec:" + serviceName +" " + args.accountId + " " + accountInfo.username + " online 4");
+				var loginStateRec = {
+					objects:
+					[
+						{
+							_kind: "com.ericblade.synergv.loginstate:1",
+							serviceName: serviceName,
+							accountId: args.accountId,
+							username: accountInfo.username,
+							state: "online",
+							availability: 4
+						}
+					]
+				};
+				future.nest(PalmCall.call("palm://com.palm.db/", "put", loginStateRec).then(function(f) {
+					console.log("loginstate put result", JSON.stringify(f.result));
+				}));
+				future.nest(PalmCall.call("palm://com.ericblade.synergv.service/", "startActivity", { accountId: args.accountId }).then(function(f) {
+					console.log("activity start result", JSON.stringify(f.result));
+					PalmCall.call("palm://com.ericblade.synergv.service/", "syncContacts", { accountId: args.accountId });
+					PalmCall.call("palm://com.ericblade.synergv.service/", "sync", { accountId: args.accountId, firstSync: true });
+					future.result = { returnValue: true };					
+				}));
+			}));
+		}
 	}
-	else
-	{
-		// Create an object to insert into the database, so that the messaging app
-		// knows that we exist.
-		var loginStateRec = {
-			"objects":[
-			{
-				_kind: "com.ericblade.synergv.loginstate:1",
-				// TODO: we should pull this from the account template.. how?
-				serviceName: "type_synergv",
-				accountId: args.accountId,
-				username: "blade.eric", 
-				state: "online", // it doesn't -seem- to matter what i put here, there may be another parameter involved
-				availability: 1
-			}]
-		};
-
-		// And then start an Activity to organize our syncing
-		future.nest(PalmCall.call("palm://com.palm.db/", "put", loginStateRec).then(function(f) {
-			console.log("loginstate put result", JSON.stringify(f.result))
-		}));
-		future.nest(PalmCall.call("palm://com.palm.activitymanager/", "create",
-									{
-										start: true,
-										activity: {
-											name: "SynerGVOutgoingSync:" + args.accountId,
-											description: "SynerGV Pending Messages Watch",
-											type: {
-												foreground: true,
-												power: true,
-												powerDebounce: true,
-												explicit: true,
-												persist: true,
-											},
-											requirements: { internet: true },
-											trigger: {
-												method: "palm://com.palm.db/watch",
-												key: "fired",
-												params: {
-													subscribe: true,
-													query: {
-														from: "com.ericblade.synergv.immessage:1",
-														where: [
-															{ prop: "status", op: "=", val: "pending" },
-															{ prop: "folder", op: "=", val: "outbox" },
-														],
-														limit: 1
-													}
-												}
-											},
-											callback: {
-												method: "palm://com.ericblade.synergv.service/sync",
-												params: '{ accountId: "' + args.accountId + '" }',
-											}
-										}
-								
-			
-		}).then(function(f) {
-			console.log("activity start result", JSON.stringify(f.result));
-			future.result = { returnValue: true };
-		}));
-	}
-					  
-};
-
-
-// Here's some possibly not well known things about the services that I'm learning while attempting to read the
-// service code itself (which is in Javascript, but without knowing it's intentions, it's quite difficult to read
-// for my skill level)
-//
-// The command assistants appear to be instances of Prototype js lib Classes.
-// You should be able to do something like
-//
-// runCommandAssistant = Class.create({ run: ..., complete: ... })
-//
-// This would make it a lot more enyo-like in structure.
-//
-// Available functions that the service appears to call inside a class:
-//
-// setup - called before running a command (we should try to adopt a thing here, perhaps)
-// commandTimeout - not a function, but apparently you can set the timeout for individual commands by setting a commandTimeout
-//                  variable.  This will override the command's configured timeout or the service as a whole's timeout
-// timeoutReceived - called when a command has reached it's timeout
-// complete - called when a command run is completed
-// cleanup - called after complete
-// yield - called when a "yield" Event happens, whatever that means
-// cancelSubscription - presumably called when a subscription is cancelled
-
-// The "sync" assistant is normally called from the CONTACTS "Sync Now" button.
-// This doesn't seem to be the case when a MESSAGING connector is added, but we're going
-// to use this to fire off a database watch.  If you're going to be retrieving data from the
-// internet (presumably!) you probably want to add a call to the Alarm function, so that you
-// can get a wake up alert here.
-// Keep in mind that Synergy can create multiple accounts of one type, so you probably want to dig up
-// all possible accountinfos, and sync them all.
-
-// TODO: Add support to the test app to inject accountId here
+});
 
 var startActivity = Class.create({
 	run: function(activityFuture)
 	{
 		var args = this.controller.args;
-		PalmCall.call("palm://com.palm.activitymanager/", "create",
-		{
-		start: true,
-		activity: {
-			name: "SynerGVOutgoingSync:" + args.accountId,
-			description: "SynerGV Pending Messages Watch",
-			type: {
-				foreground: true,
-				power: true,
-				powerDebounce: true,
-				explicit: true,
-				persist: true
-			},
-			requirements: {
-				internet: true
-			},
-			trigger: {
-				method: "palm://com.palm.db/watch",
-				key: "fired",
-				params: {
-					subscribe: true,
-					query: {
-						from: "com.ericblade.synergv.immessage:1",
-						where: [
-							{ prop: "status", op: "=", val: "pending" },
-							{ prop: "folder", op: "=", val: "outbox" }
-						],
-						limit: 1
+		var x = PalmCall.call("palm://com.palm.activitymanager/", "create",
+			{
+				start: true,
+				activity: {
+					name: "SynerGVOutgoingSync:" + args.accountId,
+					description: "SynerGV Pending Messages Watch",
+					type: {
+						foreground: true,
+						power: true,
+						powerDebounce: true,
+						explicit: true,
+						persist: true
+					},
+					requirements: {
+						internet: true
+					},
+					trigger: {
+						method: "palm://com.palm.db/watch",
+						key: "fired",
+						params: {
+							subscribe: true,
+							query: {
+								from: "com.ericblade.synergv.immessage:1",
+								where: [
+									{ prop: "status", op: "=", val: "pending" },
+									{ prop: "folder", op: "=", val: "outbox" }
+								],
+								limit: 1
+							}
+						}
+					},
+					callback: {
+						method: "palm://com.ericblade.synergv.service/sync",
+						params: "{ accountId: " + args.accountId + " }"
 					}
 				}
-			},
-			callback: {
-				method: "palm://com.ericblade.synergv.service/sync",
-				params: "{ accountId: " + args.accountId + " }"
 			}
-		}
-		}).then(function(f) {
+		);
+		// there's probably already an activity for it
+		x.onError(function(f) {
+			console.log("activity starting failed for some reason");
+			activityFuture.result = { returnValue: true };
+		});
+		x.then(function(f) {
 			console.log("startActivity result=", JSON.stringify(f.result));
 			activityFuture.result = f.result;
 		});
@@ -568,63 +567,173 @@ var cancelActivity = Class.create({
 	run: function(cancelFuture)
 	{
 		var args = this.controller.args;
-		PalmCall.call("palm://com.palm.activitymanager/", "cancel", {
-			activityName: "SynerGVOutgoingSync:" + args.accountId
-		}).then(function(f) {
-			cancelFuture.result = f.result;
+		PalmCall.call("palm://com.palm.service.accounts/", "getAccountInfo", { accountId: args.accountId }).then(function(f) {
+			console.log("Cancelling activity for accountId")
+			PalmCall.call("palm://com.palm.activitymanager/", "cancel", {
+				activityName: "SynerGVOutgoingSync:" + args.accountId
+			}).then(function(fut) {
+				cancelFuture.result = fut.result;
+			});
 		});
 	}
 });
 
-var sync = Class.create({
-	setup: function() {
+var storeConversation = Class.create({
+	run: function(future)
+	{
 		var args = this.controller.args;
-		var assistant = this.controller.service.assistant;
-		var future = new Future;
-		var username = "";
-		var password = "";
-		var auth = "";
-		var rnrse = "";
-		
-		console.log("*** sync setup");
-		if(args.accountId === undefined)
-		{
-			var name = args.$activity.name;
-			var x = name.indexOf(":")+1;
-			if(x == -1) return undefined;
-			args.accountId = name.substr(x);
-		}
-		
-		if(!assistant.GVclient)
-		{
-			console.log("sync was not able to locate a GVclient");
-			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVAuth:" + args.accountId }).then(function(f) {
-				auth = Base64.decode(f.result.keydata);
-			}));
-			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVRNRSE:" + args.accountId }).then(function(f) {
-				rnrse = Base64.decode(f.result.keydata);
-			}));
-			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVUsername:" + args.accountId }).then(function(f) {
-				username = Base64.decode(f.result.keydata);
-			}));
-			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVPassword:" + args.accountId }).then(function(f) {
-				password = Base64.decode(f.result.keydata);
-				console.log("sync auth details: ", username, password, rnrse, auth);
-				assistant.GVclient = new GV.Client({ email: username, password: password, rnr_se: rnrse, authToken: auth });
-				future.result = { returnValue: true };
-				console.log("*** sync setup complete");
-			}));			
+		var msg = args.conv;
+		var msgTexts = [];
+		var msgsToStore = [];
+		var msgsToMerge = [];
+		console.log("storeConversation", JSON.stringify(args));
+
+		if(msg.labels.indexOf("voicemail") !== -1) {
+			msg.messageText = "Voicemail Transcription: (" + msg.duration + " seconds) " + msg.messageText + " --- To listen: http://synergv/playVoicemail/" + args.accountId + "/" + msg.id;
+			msgTexts.push(msg.messageText);
+		} else if(msg.labels.indexOf("missed") !== -1) {
+			msg.messageText = "Missed Call" + " --- To return call with your Google Voice account: http://synergv/placecall/" + args.accountId + "/" + msg.phoneNumber;
+			msgTexts.push(msg.messageText);
+		} else if(msg.labels.indexOf("received") !== -1) {
+			msg.messageText = "Received Call";
+			msgTexts.push(msg.messageText);
+		} else if(msg.labels.indexOf("placed") !== -1) {
+			msg.messageText = "Placed Call";
+			msgTexts.push(msg.messageText);
+		} else if(msg.thread) {
+			msg.thread.forEach(function(sms, index) {
+				msgTexts.push(sms.text);
+			});
 		} else {
-			future.result = { returnValue: true };
+			console.log("Unhandled message labels: " + JSON.stringify(msg.labels));
 		}
-		return future;
-	},
+		var dbquery = {
+			from: "com.ericblade.synergv.immessage:1",
+			select: [ "messageText" ],
+			where: [
+				{ prop: "gConversationId", op: "=", val: msg.id },
+				{ prop: "messageText", op: "=", val: msgTexts }
+			]
+		};
+		future.nest(DB.find(dbquery, false, false).then(function(f) {
+			console.log("db future: ", JSON.stringify(f.result));
+			var dbResults = f.result.results;
+			PalmCall.call("palm://com.palm.service.accounts/", "getAccountInfo",
+						  { accountId: args.accountId }).
+			then(function(accountFuture) {
+				var username = accountFuture.result.result.username;
+				console.log("storeConversation for account", username);
+				
+				//console.log("********* Comparison db results", JSON.stringify(dbquery), "-----", JSON.stringify(f.result));
+				console.log("dbResults=", JSON.stringify(dbResults));
+				console.log("dbquery=", JSON.stringify(dbquery));
+				if(msg.thread) {
+					msg.thread.forEach(function(sms, index) {
+						var bFound = false;
+						for(var x = 0; x < dbResults.length; x++) {
+							//console.log("comparing", dbResults[x].messageText, "-and-", sms.text);
+							if(dbResults[x].messageText == sms.text)
+							{
+								bFound = true;
+								break;
+							}
+						}
+						if(!bFound) {
+							console.log("!bFound", sms.text);
+							var dbMsg = {
+								_kind: "com.ericblade.synergv.immessage:1",
+								accountId: args.accountId,
+								localTimestamp: parseInt(msg.startTime),
+								timestamp: parseInt(msg.startTime),
+								folder: sms.from == "Me:" ? "outbox" : "inbox",
+								status: "successful",
+								messageText: sms.text,
+								//from: { addr: sms.from == "Me:" ? username : msg.displayNumber }, // TODO: use sms.from ? also get account Name
+								from: { addr: sms.from == "Me:" ? username : msg.phoneNumber },
+								// to: [ { addr: sms.from == "Me:" ? msg.displayNumber : username } ], // TODO: use sms.from? also get account Name
+								to: [ { addr: sms.from == "Me:" ? msg.phoneNumber : username } ],
+								serviceName: "type_synergv",
+								username: username,
+								gConversationId: msg.id
+							};
+							console.log("message phoneNumber: " + msg.phoneNumber);
+							if(sms.from == "Me:" && args.storeOwn == false)
+								msgsToMerge.push(dbMsg);
+							else
+								msgsToStore.push(dbMsg);
+						}
+					});
+				} else {
+					var bFound = false;
+					//console.log("message id=", msg.id, "messageText=", msg.messageText);
+					for(var x = 0; x < dbResults.length; x++) {
+						//console.log("comparing", dbResults[x].messageText, "-and-", msg.messageText);
+						if(dbResults[x].messageText == msg.messageText)
+						{
+							bFound = true;
+							break;
+						}
+					}
+					if(!bFound) {
+						var dbMsg = {
+							_kind: "com.ericblade.synergv.immessage:1",
+							accountId: args.accountId,
+							localTimestamp: parseInt(msg.startTime),
+							timestamp: parseInt(msg.startTime),
+							folder: "inbox",
+							status: "successful",
+							messageText: msg.messageText,
+							//from: { addr: msg.displayNumber },
+							from: { addr: msg.phoneNumber },
+							to: [ { addr: username } ],
+							serviceName: "type_synergv",
+							username: username,
+							gConversationId: msg.id
+						};
+						//console.log("storing message query:", JSON.stringify(dbMsg));
+						msgsToStore.push(dbMsg);
+					}
+				}
+				f.result = { returnValue: true };
+			});
+		})).then(function(fut) {
+			DB.put(msgsToStore).then(function(wtf) {
+				console.log("stored", JSON.stringify(fut.result));
+				wtf.result = { returnValue: true };
+				fut.result = { returnValue: true };
+				future.result = { returnValue: true };
+			});
+			// TODO: we probably want to do something with msgsToMerge, to try to
+			// figure out how to update the outgoing message gConversationId in the local database... but.. screw it for now.
+		});
+	}
+})
+
+var sync = Class.create({
 	run: function(syncFuture) {
 		var assistant = this.controller.service.assistant;
 		var args = this.controller.args;
 		var conversationIds = [];
+		var mergeIds = [];
+		var tempMsgs = [];
+		var msgsToStore = [];
+		var msgTexts = [];
+		var username = this.username;
+		var GVclient;
+		
 		console.log("sync run start", JSON.stringify(args));
-		if(args.accountId === undefined)
+		if(args.accountId === undefined) {
+			console.log("sync called with no accountId!!!");
+			var actname = args.$activity.name;
+			var x = actname.indexOf(":");
+			if(x == -1) {
+				console.log("unable to pull accountId from activity");
+				syncFuture.result = { returnValue: false };
+				return syncFuture;
+			}
+			args.accountId = actname.substr(x+1);
+		}
+		/*if(args.accountId === undefined)
 		{
 			var name = args.$activity.name;
 			var x = name.indexOf(":")+1;
@@ -638,259 +747,145 @@ var sync = Class.create({
 		{
 		    syncFuture.result = { returnValue: false };
 			return;
-		}
-		var f = new Future();
+		}*/
 		var query = {
 					  from: "com.ericblade.synergv.immessage:1",
+					  orderBy: "_rev",
+					  desc: true,
 					  where:
 					  [
 						  { "prop":"folder", "op":"=", "val":"outbox" },
 						  { "prop":"status", "op":"=", "val":"pending" },
-						  // TODO: add serviceName and userName to this query
 					  ]
 				  };
-
-		f.now(function(future) {
-			console.log("setting alarm");
-			f.nest(PalmCall.call("palm://com.palm.power/timeout/", "set", {
-				key: "SynerGVsync:" + args.accountId,
-				"in": "00:05:00",
-				uri: "palm://com.ericblade.synergv.service/sync",
-				params: { accountId: args.accountId }
-			}).then(function(postAlarmFuture) {
-				console.log("alarm set result", JSON.stringify(postAlarmFuture.result));			
+				  
+				  // TODO: we really really need to store lastRev in the database somewhere and pull it up on initialization
+				  // TODO: of course, we also need to attempt to get our GV client up at initialization as well
+		if(assistant.lastRev !== undefined && assistant.lastRev !== "undefined")
+		{
+		    query.where.push({ "prop": "_rev", "op":">", "val": this.controller.service.assistant.lastRev });
+		}
+		
+		console.log("setting alarm");
+		syncFuture.nest(PalmCall.call("palm://com.palm.power/timeout/", "set", {
+			key: "SynerGVsync:" + args.accountId,
+			"in": "00:05:00",
+			uri: "palm://com.ericblade.synergv.service/sync",
+			params: { accountId: args.accountId }
+		}).then(function(f) {
+			console.log("alarm set result", JSON.stringify(f.result));
+		}));
+		var dbResults;
+		syncFuture.nest(DB.find(query, false, false).then(function(f) {
+			dbResults = f.result.results;
+			syncFuture.nest(assistant.getGVClientForAccount(args.accountId).then(function(fut) {
+				GVclient = fut.result.client;
+				PalmCall.call("palm://com.palm.service.accounts/", "getAccountInfo", { accountId: args.accountId }).then(function(fut) {
+					username = fut.result.result.username;
+					console.log("syncing for user", username);
+					f.result = { returnValue: true };
+				});
 			}));
-			future.nest(DB.find(query, false, false).then(function(dbFuture) {
-				console.log("dbFuture result=", JSON.stringify(dbFuture.result));
-				var dbResult = dbFuture.result;
-				if(dbResult.results)
+		}).
+			then(function(f) {
+			var results = dbResults;
+			console.log("pending message search result=", JSON.stringify(results));
+			if(results.length == 0) {
+				f.result = { returnValue: true };
+			}
+			for(var x = 0; x < results.length; x++) {
+				if(assistant.lastRev === undefined || assistant.lastRev < results[x]["_rev"])
 				{
-					var mergeIDs = [ ];
-					// Call our sendIM service function to actually send each message
-					// Record each message ID into an array, and then update them in
-					// the database as "successful", ie - sent.
-					// You may want to not mark them as sent in the database until they
-					// are actually sent via your sendIM function, though.
-					for(var x = 0; x < dbResult.results.length; x++)
+					console.log("new lastRev=", assistant.lastRev);
+					assistant.lastRev = results[x]["_rev"];
+				}
+				console.log("outgoing msg from", results[x].from.addr, "comparing to", username);
+				if(results[x].from.addr !== username)
+				{
+					continue;
+				}
+				f.nest(PalmCall.call("palm://com.ericblade.synergv.service/", "sendIM", {
+					msgId: results[x]["_id"],
+					accountId: args.accountId,
+					to: results[x].to[0].addr,
+					text: results[x].messageText
+				}).then(function(fut) {
+					if(fut.result.returnValue === true)
 					{
-						console.log("Merging status of ", dbResult.results[x]["_id"]);
-						PalmCall.call("palm://com.ericblade.synergv.service/", "sendIM", {
-							accountId: args.accountId,
-							to: dbResult.results[x].to[0].addr,
-							text: dbResult.results[x].messageText
-						});
-						mergeIDs.push( { "_id": dbResult.results[x]["_id"], "status": "successful" });
-					}
-					DB.merge(mergeIDs);
-				}
-				future.result = { returnValue: true };
-			}));
-		}).then(function(retrieveFuture) {
-			console.log("********* Retrieving messages");
-			if(!assistant.GVclient)
-			{
-				console.log("*** setting up gvclient ");
-				this.setup();
-			}
-			console.log("*** ready?");
-			assistant.GVclient.get('unread', null, function(error, response) {
-				var msgstostore = [];
-				if(error) {
-					console.log("error retrieving unread messages", JSON.stringify(error));
-				} else {
-					response.messages.forEach(function(msg, index) {
-						conversationIds.push(msg.id)
-						var convquery = {
-							from: "com.ericblade.synergv.immessage:1", 
-							where: [ { prop: "gConversationId", op:"=", val: msg.id } ]
-						};
-						var msglist = [ ];
-						if(msg.thread) // phone calls do not have a thread associated with them
-						{
-							msg.thread.forEach(function(sms) {
-								//console.log("query text", sms.text);
-								msglist[msglist.length] = sms.text;
-							});
-							convquery = {
-								from: "com.ericblade.synergv.immessage:1",
-								select: [ "messageText" ],
-								where: [
-									{ prop: "gConversationId", op: "=", val: msg.id },
-									{ prop: "messageText", op: "=", val: msglist },
-								]
+						if(fut.result.status != "successful") {
+							var dbMsg = {
+								_kind: "com.ericblade.synergv.immessage:1",
+								accountId: args.accountId,
+								localTimestamp: parseInt(new Date().getTime()),
+								timestamp: parseInt(new Date().getTime()),
+								folder: "system",
+								status: "successful",
+								messageText: "Message send failure, code: " + fut.result.errorcode + " error msg: " + fut.result.errormsg,
+								from: { addr: fut.result.destination },
+								to: [ { addr: username } ], 
+								serviceName: "type_synergv",
+								username: username,
+								//gConversationId: msg.id
 							};
-							console.log("*** performing database query for all loaded messages");
-							DB.find(convquery, false, false).then(function(dbtestFuture) {
-								console.log("********* dbtest results", JSON.stringify(dbtestFuture.result.results));
-								msg.thread.forEach(function(sms) {
-									var bFound = false;
-									//console.log("checking list of length ", dbtestFuture.result.results.length);
-									for(var i = 0; i < dbtestFuture.result.results.length; i++)
-									{
-										var messageText = dbtestFuture.result.results[i].messageText;
-										bFound = (messageText == sms.text);
-										if(bFound) {
-											break;
-										}
-									}
-									if(!bFound) {
-										if(sms.from == "Me:") {
-											var mergedata = {
-												"gConversationId": msg.id,
-												"successful": true
-											};
-											var mergequery = {
-												"from":"com.ericblade.synergv.immessage:1",
-												"where": [
-													{ "prop":"folder", "op":"=", "val":"outbox" },
-													{ "prop":"messageText", "op":"=", "val": sms.text },
-												]
-											}
-/*				
-					var dbq = [{
-							_kind: "com.ericblade.synergv.immessage:1",
-							accountId: args.accountId,
-							localTimestamp: parseInt(args.time),
-							timestamp: parseInt(args.time),//Math.round(this.MessageIndex[index].startTime / 100),
-							folder: args.from == "Me:" ? "outbox" : "inbox",
-							status: "successful",
-							//flags: { read: this.MessageIndex[index].isRead, visible: true },
-							messageText: args.text,
-							from: { addr: args.from == "Me:" ? "blade.eric" : args.displayNumber },
-							to: [{ addr: args.from == "Me:" ? args.displayNumber : "blade.eric" }],
-							serviceName: "type_synergv",
-							// TODO: MAKE THIS RIGHT
-							username: "blade.eric",
-							gConversationId: args.id
-						}];
-
-*/											
-											console.log("merging", sms.text);
-											DB.merge(mergequery, mergedata).then(function(mergeFuture) {
-												console.log("merge status", JSON.stringify(mergeFuture.result));
-												if(mergeFuture.result.returnValue === false || mergeFuture.result.count === 0)
-												{
-													msgstostore.push({
-														_kind: "com.ericblade.synergv.immessage:1",
-														accountId: args.accountId,
-														localTimestamp: parseInt(msg.startTime),
-														timestamp: parseInt(msg.startTime),
-														folder: "outbox",
-														status: "successful",
-														messageText: sms.text,
-														from: "blade.eric",
-														to: args.displayNumber,
-														serviceName: "type_synergv",
-														username: "blade.eric",
-														gConversationId: args.id
-													});
-												}
-											});
-										} else {
-											msgstostore.push({
-												_kind: "com.ericblade.synergv.immessage:1",
-												accountId: args.accountId,
-												localTimestamp: parseInt(msg.startTime),
-												timestamp: parseInt(msg.startTime),
-												folder: "inbox",
-												status: "successful",
-												messageText: sms.text,
-												from: args.displayNumber,
-												to: "blade.eric",
-												serviceName: "type_synergv",
-												username: "blade.eric",
-												gConversationId: args.id
-											});
-										}
-									} else {
-										console.log("ignoring", sms.text);
-									}
-								});
-							});
+							DB.put([ dbMsg ]);
 						}
-							/*msg.thread.forEach(function(sms) {
-							PalmCall.call("palm://com.ericblade.synergv.service/", "storeMsg", { accountId: args.accountId, id: msg.id, from: sms.from, displayNumber: msg.displayNumber, time: msg.startTime, text: sms.text });
-							console.log(sms.time, msg.displayStartTime, sms.from, sms.text);
-						});*/
-					});
-				}
-				if(msgstostore.length > 0)
-				{
-					DB.put(msgstostore).then(function(putFuture) {
-						console.log("putFuture result", JSON.stringify(putFuture.result));
-					});
-				}
-				
-				retrieveFuture.result = { returnValue: true };
-				syncFuture.result = { returnValue: true };
-			});
-		}).then(function(tooManyFutures) {
-			if(conversationIds.length > 0)
-			{
-				console.log("marking read: ", JSON.stringify(conversationIds));
-				assistant.GVclient.set('read', { id: conversationIds });
+						mergeIds.push( { "_id": fut.result.msgId, "status": fut.result.status });					
+						//fut.result = { returnValue: true };
+						if(x >= results.length - 1)
+						{
+							f.result = { mergeIds: mergeIds, returnValue: true };
+						}
+					}
+				}));
+				//mergeIds.push( { "_id": results[x]["_id"], "status": "successful" });
 			}
+			f.then(function(fut) {
+				console.log("********** all messages to mark successful: ", JSON.stringify(fut.result.mergeIds));
+				fut.nest(DB.merge(mergeIds).then(function(mergeFut) {
+					console.log("merge status", JSON.stringify(mergeFut.result));
+					mergeFut.result = { returnValue: true };
+				}));
+			});
+		})).then(function(f) {
+			console.log("***** retrieving messages from server", JSON.stringify(f.result));
+			var start = ( ((args.page || 1) - 1) * 10) + 1;
+			GVclient.get(args.firstSync ? 'all' : (args.inbox || 'unread'), { start: start, limit: 10 } ,function(error, response){
+			//GVclient.get('all', null ,function(error, response){
+			//assistant.GVclient.get('inbox', { limit: 10 }, function(error, response) {
+				console.log("***** messages retrieved");
+				if(error){
+					console.log('Error: ',error);
+				}else{
+					console.log('There are %s messages in the unread box. The last %s are: ',response.total, response.messages.length);
+					var counter = 0;
+					response.messages.forEach(function(msg, index) {
+						conversationIds.push(msg.id);
+						console.log(msg.isRead ? ' ' : '*', (index+1)+'.', msg.displayStartDateTime, msg.displayNumber);
+						PalmCall.call("palm://com.ericblade.synergv.service/", "storeConversation", { conv: msg, accountId: args.accountId, storeOwn: args.firstSync === true });
+					});
+					f.result = { returnValue: true };
+				}
+			});			
+		}).then(function(f) {
+			//console.log("All messages:", JSON.stringify(tempMsgs));
+			// TODO: check if there actually are any messages to mark before sending the mark read
+			console.log("****** END OF SYNCFUTURE!!!!!!! Marking read:", JSON.stringify(conversationIds));
+			if(args.markMessagesRead) {
+				GVclient.set('read', { id: conversationIds }, function() {
+					console.log("Messages marked read.");
+				});
+			}
+			syncFuture.result = { returnValue: true };
 		});
 	},
-/*
- 	{
-		"$activity":
-		{
-			"activityId":1655,
-			"callback":
-			{
-				"serial":530226716
-			},
-			"creator":
-			{
-				"serviceId":"com.ericblade.synergv.service"
-			},
-			"name":"SynerGVOutgoingSync:++HzTLgeaRwu+fra",
-			"requirements":
-			{
-				"internet":
-				{
-					"bridge":
-					{
-						"state":"disconnected"
-					},
-					"isInternetConnectionAvailable":true,
-					"vpn":
-					{
-						"state":"disconnected"
-					},
-					"wan":
-					{
-						"state":"disconnected"
-					},
-					"wifi":
-					{
-						"bssid":"20:4E:7F:0B:6B:EF",
-						"interfaceName":"eth0",
-						"ipAddress":"192.168.1.100",
-						"isWakeOnWifiEnabled":true,
-						"networkConfidenceLevel":"excellent",
-						"onInternet":"yes",
-						"ssid":"Angel",
-						"state":"connected"
-					}
-				}
-			},
-			"trigger":
-			{
-				"fired":true,
-				"returnValue":true
-			}
-		},
-		"accountId":"++HzTLgeaRwu+fra"
-	}
-*/
 	complete: function() {
 		var args = this.controller.args;
 		var activity = args.$activity;
 		console.log("sync complete starting", JSON.stringify(args));
+		console.log("activity received was", JSON.stringify(activity));
 		if(args.accountId === undefined) return;
-		return activity && PalmCall.call("palm://com.palm.activitymanager/", "complete", {
+		if(activity === undefined) return;
+		var newact = {
 			//activityName: "SynerGVOutgoingSync",
 			activityId: activity.activityId,
 			restart: true,
@@ -907,21 +902,25 @@ var sync = Class.create({
 					  [
 						  { "prop":"folder", "op":"=", "val":"outbox" },
 						  { "prop":"status", "op":"=", "val":"pending" },
-						  // TODO: add serviceName and userName here
 					  ],
 					  limit: 1
 				  },
 				  subscribe: true
 			  },
 			}
-		}).then(function(f) {
+		};
+		if(this.controller.service.assistant && this.controller.service.assistant.lastRev)
+		{
+			newact.trigger.params.query.where.push({ "prop": "_rev", "op":">", "val": this.controller.service.assistant.lastRev });
+		}
+		PalmCall.call("palm://com.palm.activitymanager/", "complete",  newact).then(function(f) {
 			console.log("sync complete completed", JSON.stringify(f.result));
 			f.result = { returnValue: true };
 		})
 	}	
 });
 
-var storeMsg = Class.create({
+/*var storeMsg = Class.create({
 	run: function(future)
 	{
 		var args = this.controller.args;
@@ -933,34 +932,6 @@ var storeMsg = Class.create({
 				{ prop: "messageText", op:"=", val: args.text }
 			]
 		};
-					/*var dbq = [{
-							_kind: "com.ericblade.synergv.immessage:1",
-							// TODO: MAKE THIS RIGHT
-							accountId: args.accountId,
-							localTimestamp: parseInt(args.time),
-							timestamp: parseInt(args.time),//Math.round(this.MessageIndex[index].startTime / 100),
-							folder: args.from == "Me:" ? "outbox" : "inbox",
-							status: "successful",
-							//flags: { read: this.MessageIndex[index].isRead, visible: true },
-							messageText: args.text,
-							from: { addr: args.from == "Me:" ? "blade.eric" : args.displayNumber },
-							to: [{ addr: args.from == "Me:" ? args.displayNumber : "blade.eric" }],
-							serviceName: "type_synergv",
-							// TODO: MAKE THIS RIGHT
-							username: "blade.eric",
-							gConversationId: args.id
-						}];
-		
-		console.log("dbq=",JSON.stringify(dbq));
-		future.result = { returnValue: true };
-		return;*/
-/*		DB.find(query, false, false).then(function(dbFuture) {
-			var result = dbFuture.result;
-			if(result.returnValue === true) {
-				console.log("db find success, res=" + JSON.stringify(result.results));
-				if(result.results.length == 0) // store it!
-				{
-*/
 					var dbq = [{
 							_kind: "com.ericblade.synergv.immessage:1",
 							accountId: args.accountId,
@@ -983,14 +954,483 @@ var storeMsg = Class.create({
 						console.log("putFuture result", JSON.stringify(putFuture.result));
 						future.result = { returnValue: true };
 					});
-/*				} else {
-					console.log("duplicate item");
+	}
+});*/
+
+var syncAllAccounts = Class.create({
+	run: function(future) {
+		var args = this.controller.args;
+		var q = { select: ["accountId"], from: "com.ericblade.synergv.configuration:1" };
+		DB.find(q, false, false).then(function(f) {
+			var results = f.result.results;
+			for(var x in results) {
+				PalmCall.call("palm://com.ericblade.synergv.service/", "sync", { accountId: results[x].accountId });
+			}
+			future.result = { returnValue: true };
+		});
+	}
+});
+
+var syncContacts = Class.create({
+	setup: function() {
+		var args = this.controller.args;
+		var assistant = this.controller.service.assistant;
+		var future = new Future;
+		var username = "";
+		var password = "";
+		var auth = "";
+		var rnrse = "";
+		
+		console.log("*** syncContacts setup");
+		if(args.accountId === undefined)
+		{
+			args.accountId = "++I3QFFczN_8Mbxe";
+			/*var name = args.$activity.name;
+			var x = name.indexOf(":")+1;
+			if(x == -1) return undefined;
+			args.accountId = name.substr(x);*/
+		}
+		if(!assistant.GVclient)
+		{
+			console.log("sync was not able to locate a GVclient");
+			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVAuth:" + args.accountId }).then(function(f) {
+				auth = Base64.decode(f.result.keydata);
+			}));
+			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVRNRSE:" + args.accountId }).then(function(f) {
+				rnrse = Base64.decode(f.result.keydata);
+			}));
+			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVUsername:" + args.accountId }).then(function(f) {
+				username = Base64.decode(f.result.keydata);
+			}));
+			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVPassword:" + args.accountId }).then(function(f) {
+				password = Base64.decode(f.result.keydata);
+				console.log("sync auth details: ", username, password, rnrse, auth);
+				assistant.GVclient = new GV.Client({ email: username, password: password, rnr_se: rnrse, authToken: auth });
+				future.result = { returnValue: true };
+				console.log("*** sync setup complete");
+				return future;
+			}));			
+		} else {
+			future.result = { returnValue: true };
+		}
+		return future;
+	},
+	run: function(future) {
+		var assistant = this.controller.service.assistant;
+		var args = this.controller.args;
+		var dbContacts = [];
+
+		console.log("sync contacts begin");		
+		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
+			var GVclient = f.result.client;
+			assistant.GVclient.getContacts(function(error, contacts) {
+				if(error) {
+					// error.code = 10 message=GOOGLE_CLIENTLOGIN_ERROR - incorrect userid/password
+					// error.code = 11 message=REQUEST_ERROR - wifi off					
+					console.log("error retrieving contacts " + JSON.stringify(error));
+					future.setException(Foundations.Err.create(error.code, error.message));
+					future.result = { returnValue: false, errorCode: error.code, errorText: error.message };
+				} else {
+					//console.log("Contacts received", JSON.stringify(contacts));
+					contacts.forEach(function(contact, index) {
+						var c = 
+						{
+							_kind: "com.ericblade.synergv.contact:1",
+							remoteId: contact.contactId,
+							accountId: args.accountId,
+							nickname: contact.name,
+							imBuddy: true, // IF YOU DON'T HAVE THIS AND YOU'RE AN IM TRANSPORT, THINGS GET REALLY WEIRD IN THE MESSAGING APP!
+							phoneNumbers: [], // filled in later
+							ims: [], // filled in later
+							emails: [], // filled in later
+							photos: [], // filled in later
+						};
+						contact.emails.forEach(function(em, index) {
+							c.emails.push({
+								type: "type_email",
+								value: em
+							});
+						});
+						contact.numbers.forEach(function(pn, index) {
+							var type = "type_mobile";
+							switch(pn.phoneType) {
+								case "work":
+									type = "type_work";
+									break;
+								case "home":
+									type = "type_home";
+									break;
+								case "mobile":
+									type = "type_mobile";
+									break;
+								default:
+									type = "type_other";
+									break;
+							}
+							c.phoneNumbers.push({ type: type, value: pn.phoneNumber });
+                            c.phoneNumbers.push({ type: type, value: pn.displayNumber });
+							//c.ims.push({ serviceName: "type_synergv", type: "type_synergv", label: "Google Voice", value: pn.displayNumber });
+							c.ims.push({ serviceName: "type_synergv", type: "type_synergv", label: "Google Voice", value: pn.phoneNumber });
+						});
+						try {
+							fs.mkdirSync('/media/internal/.synergvimages', 0777);
+						} catch(err) {
+							
+						}
+						/*if(contact.photoUrl && contact.photoUrl != "") {
+							console.log("retrieving picture with auth " + assistant.GVclient.config.authToken);
+							console.log("picture is at https://www.google.com/s2" + contact.photoUrl);
+							PalmCall.call("palm://com.ericblade.synergv.service", "httpsRequest", {
+								host: "www.google.com",
+								path: "/s2" + contact.photoUrl + "?sz=32",
+								method: "GET",
+								headers: {
+									"Authorization":"GoogleLogin auth=" + assistant.GVclient.config.authToken
+								},
+								savefile: "/media/internal/.synergvimages/" + contact.contactId + ".jpg",
+								binary: true
+							});
+							c.photos.push({
+								value: "https://www.google.com/s2/ " + contact.photoUrl,
+								type: "type_square",
+								localPath: "/media/internal/.synergvimages/" + contact.contactId + ".jpg"
+							});
+						}*/
+						dbContacts.push(c);
+						//console.log(JSON.stringify(c));
+					});
+					DB.put(dbContacts).then(function(f) {
+						console.log("put", f.result.results.length, "contacts");
+						future.result = f.result; //{returnValue: true };//f.result;
+					});
+				}
+			});
+		}));
+	}
+});
+
+var downloadVoicemail = Class.create({
+	run: function(future) {
+		var assistant = this.controller.service.assistant;
+		var args = this.controller.args;
+		
+		console.log("downloading voicemail for " + args.msgId + " to " + args.fileName);
+		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
+			var GVclient = f.result.client;
+			GVclient.download({id: args.msgId }, function(err, httpResponse, body){
+				if(err){
+					future.result = { returnValue: false, errorText: err };
+					console.log('Error downloading message ', args.msgId,':',err);
+				}else{
+					console.log('Downloaded ', args.fileName, JSON.stringify(httpResponse), err);
+					try {
+						fs.writeFileSync(args.fileName, body, 'binary');
+					} catch(err) {
+						console.log("Failed to write to ", args.fileName);
+					}
+					f.result = { returnValue: true, file: args.fileName };
+					future.result = { returnValue: true, file: args.fileName };
+				}
+			});			
+		}));
+		return future;
+	}
+});
+
+var createVoicemailDir = Class.create({
+	run: function(future) {
+		fs.mkdirSync('/media/internal/.synergv', 0777);
+		future.result = { returnValue: true };
+	}
+});
+
+function deleteDirRecursive(path, failSilent) {
+    var files;
+
+    try {
+        files = fs.readdirSync(path);
+    } catch (err) {
+        if(failSilent) return;
+        throw new Error(err.message);
+    }
+
+    /*  Loop through and delete everything in the sub-tree after checking it */
+    for(var i = 0; i < files.length; i++) {
+        var currFile = fs.lstatSync(path + "/" + files[i]);
+
+        if(currFile.isDirectory()) // Recursive function back to the beginning
+            exports.rmdirSyncRecursive(path + "/" + files[i]);
+
+        else if(currFile.isSymbolicLink()) // Unlink symlinks
+            fs.unlinkSync(path + "/" + files[i]);
+
+        else // Assume it's a file - perhaps a try/catch belongs here?
+            fs.unlinkSync(path + "/" + files[i]);
+    }
+
+    /*  Now that we know everything in the sub-tree has been deleted, we can delete the main
+        directory. Huzzah for the shopkeep. */
+    return fs.rmdirSync(path);
+};
+
+var deleteVoicemailDir = Class.create({
+	run: function(future) {
+		deleteDirRecursive("/media/internal/.synergv");
+		future.result = { returnValue: true };
+	}
+});
+
+var httpsRequest = Class.create({
+	run: function(future)
+	{
+		if(https === undefined)
+		{
+			console.log("https using curl?");
+			var args = this.controller.args;
+			var host = args.host || "www.google.com";
+			var port = args.port || "443";
+			var path = args.path || "/";
+			
+			var url = "https://" + host + ":" + port + path;
+			var cmd = "curl -k ";
+			
+			if(args.cookies) {
+				cmd += ' -b "' + args.cookies + '"';
+			}
+			if(args.headers) {
+				var h;
+				for(h in args.headers)
+				{
+					cmd += ' -H "' + h + ':' + args.headers[h] + '"';
+				}
+			}
+			if(args.savefile)
+				cmd += " -s -o " + args.savefile;
+	
+			cmd += " " + url;
+			console.log("Download command: " + cmd);
+			var child = child_process.exec(cmd, function(error, stdout, stderr) {
+				future.result = { returnValue: error == null, data: stdout, file: args.savefile };
+			});
+			return;
+		}
+		console.log("https using node");
+		/* Copy the arguments passed in from the PalmService call */
+		var args = this.controller.args;
+		/* We're going to be receiving a bunch of data over time, this will cache it
+		 * all until we're done
+		 */
+		var recdata = "";
+		/* Set our connection options */
+		var options = {
+			host: args.host ? args.host : "www.google.com",
+			port: args.port ? args.port : 443,
+			path: args.path ? args.path : "/",
+			method: args.method ? args.method : "GET"
+		};
+		/* If client passed us headers, set them */
+		if(args.headers)
+			options.headers = args.headers;
+		/* NOW: start a https request, this will sit here and wait until the "end"
+		 * callback is triggered
+		 */
+		future.now(function(thisfuture) {
+			/* Some logging to make sure we're alive -- tail -f /var/log/messages to
+			 * watch for service logs
+			 */
+			console.log("HOST:", options.host, "PORT:", options.port);
+			/* Call to the Node library to perform the https request -- This will
+			 * not actually start processing until we fire request.end()
+			 */
+			var request = https.request(options,
+				function(result) {
+					/* When we receive data, concat it to the recdata cache, throw a
+					 * log just so the operator can see we're alive
+					 */
+					result.on("data",
+						function(data) {
+							recdata += data;
+							console.log("received some data")
+						}
+					);
+					if(args.binary)
+						result.setEncoding('binary');
+					/* The future will not return until we set thisfuture.result,
+					 * which we'll do when we receive the "end" from the https
+					 * request
+					 */
+					result.on("end",
+						function() {
+							console.log("received end of data");
+							if(args.savefile)
+								fs.writeFileSync(args.savefile, recdata, args.binary ? 'binary' : 'utf8');
+							thisfuture.result = { data: recdata, file: args.savefile, returnValue: true }
+						}
+					);
+					/* Connection closed before we got an end? Let's see what data
+					 * we did get.
+					 * www.google.com gives me this event, while developer.palm.com
+					 * gives me a proper "end"
+					 */
+					result.on("close",
+						function() {
+							console.log("received connection closed");
+							if(args.savefile)
+								fs.writeFileSync(args.savefile, recdata, args.binary ? 'binary' : 'utf8');
+							thisfuture.result = { data: recdata, file: args.savefile, returnValue: true }
+						}
+					);
+				});
+			/* Once we have the pending request object, if we have data to send,
+			 * then send it
+			 */
+			if(options.method == "POST" && options.postdata) {
+				request.write(querystring.stringify(options.postdata));
+			}
+			/* Flag that the request is all setup, and now Node will fire it */
+			request.end();
+		})    
+	}
+});
+
+var fetchAuthKey = Class.create({
+	run: function(future)
+	{
+		var assistant = this.controller.service.assistant;
+		var args = this.controller.args;
+		
+		PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVAuth:" + args.accountId }).then(function(f) {
+			auth = Base64.decode(f.result.keydata);
+			future.result = { returnValue: true, auth: auth };
+		});
+		return future;
+	}
+})
+
+var getGVSettings = Class.create({
+	run: function(future) {
+		var assistant = this.controller.service.assistant;
+		var args = this.controller.args;
+		
+		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
+			var GVclient = f.result.client;
+			GVclient.getSettings(function(err, settings) {
+				future.result = { returnValue: true, settings: settings };
+				fs.writeFileSync("/media/internal/gvsettings.json", JSON.stringify(future.result));
+			});
+		}));
+		return future;
+	}
+});
+
+var startCall = Class.create({
+	run: function(future) {
+		var assistant = this.controller.service.assistant;
+		var args = this.controller.args;
+		
+		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
+			var GVclient = f.result.client;
+			GVclient.connect('call',{outgoingNumber:args.outgoingNumber, forwardingNumber:args.forwardingNumber, phoneType:args.phoneType}, function(error, response, body){
+				var data = JSON.parse(body);
+				if(error || !data.ok){
+					console.log('Error: ', error, ', response: ', body);
+					future.result = { returnValue: false, error: error };
+				}else{
+					console.log('Call placed.');
+					future.result = { returnValue: true, error: error };
+				}
+			});			
+		}));
+		return future;
+	}
+});
+
+var cancelCall = Class.create({
+	run: function(future) {
+		var assistant = this.controller.service.assistant;
+		var args = this.controller.args;
+		
+		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
+			var GVclient = f.result.client;
+			GVclient.connect('cancel', null);
+			future.result = { returnValue: true };
+		}));
+		return future;
+	}	
+});
+
+var editGeneralSettings = Class.create({
+	run: function(future) {
+		var args = this.controller.args;
+		var assistant = this.controller.service.assistant;
+		console.log("editGeneralSettings", JSON.stringify(args));
+		
+		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
+			console.log("sending with client ", JSON.stringify(f.result.client));
+			var client = f.result.client;
+			client.connect('settings', args.options, function(error, response, body) {
+				var data = JSON.parse(body);
+				var errormsg = "";
+				if(error || !data.ok) {
+					console.log("Error: ", error);
+					console.log("body: ", body);
+					console.log("data.ok: ", data.ok);
+					console.log("data.code: ", data.data.code);
+					future.result = { errorcode: data.data.code, errormsg: errormsg,
+										returnValue: false };
+				} else {
+					console.log("Settings changed");
 					future.result = { returnValue: true };
 				}
-			} else {
-				future.result = dbFuture.exception;
-				console.log("find failure");
-			}
-		});*/
+			});
+		}));
+	},
+});
+
+var setMessageFlag = Class.create({
+	run: function(future) {
+		var args = this.controller.args;
+		var assistant = this.controller.service.assistant;
+		console.log("setMessageFlag", JSON.stringify(args));
+		
+		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
+			var client = f.result.client;
+			var options = { };
+			options.id = args.id;
+			if(args.note)
+				options.note = args.note;
+			if(args.transcript)
+				options.transcript = args.transcript; // TODO: saveTranscript ?! neat
+			if(args.email)
+				options.email = args.email;
+			if(args.subject && args.email)
+				options.subject = args.subject;
+			if(args.body && args.email)
+				options.body = args.body;
+			if(args.link && args.email)
+				options.link = args.link;
+			console.log("setMessageFlag options=");
+			console.log(JSON.stringify(options));
+			client.set(args.flag, options, function(error, response, body) {
+				//console.log("error=" + error + " response=" + JSON.stringify(response) + " body=" + body);
+				if(error == "HTTP_ERROR") {
+					future.result = { returnValue: false, errormsg: "HTTP Error", errorcode: response.statusCode };
+					return;
+				}
+				var data = JSON.parse(body);
+				var errormsg = "";
+				if(error || !data.ok) {
+					console.log("Error: ", error);
+					console.log("body: ", body);
+					console.log("data.ok: ", data.ok);
+					console.log("data.code: ", data.errorCode);
+					future.result = { errorcode: data.errorCode, errormsg: error,
+										returnValue: false };
+				} else {
+					console.log("Settings changed");
+					future.result = { returnValue: true };
+				}			
+			});
+		}));
 	}
 })

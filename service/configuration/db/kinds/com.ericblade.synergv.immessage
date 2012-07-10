@@ -5,17 +5,11 @@
     "sync": true,
     "indexes": [
         {
-            "name": "outgoingMsg",
+            "name": "outgoingMsgByRev",
             "props": [
-                {
-                    "name": "folder"
-                },
-                {
-                    "name": "status"
-                },
-                {
-                    "name": "localTimestamp"
-                }
+                { "name": "folder" },
+                { "name": "status" },
+                { "name": "_rev" }
             ]
         },
         {
@@ -46,6 +40,22 @@
             "props": [
                 { "name": "folder" },
                 { "name": "messageText" }
+            ]
+        },
+        {
+            "name": "messageTextOnly",
+            "props": [
+                { "name": "messageText", "collate":"primary" }
+            ]
+        },
+        {
+            "name": "accountId",
+            "props": [ { "name": "accountId" } ]
+        },
+        {
+            "name": "conversations",
+            "props": [
+               { "name": "conversations" }
             ]
         }
     ]

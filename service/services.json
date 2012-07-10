@@ -1,75 +1,48 @@
 {
-    "id":"com.ericblade.synergv.service",
-    "description":"SynerGV Service",
-    "engine":"node",
-    "activityTimeout":30,
-    "services" : [
-        { 
-	  "name":"com.ericblade.synergv.service",
-          "description": "SynerGV Service",
-          "globalized": false,
-          "commands": [
-	      { "name":"checkCredentials",
-	        "assistant":"checkCredentials",
-			"public": true
-	      },
-	      { "name":"onCreate",
-	        "assistant": "onCreate",
-			"public": true
-	      },
-	      { "name": "onDelete",
-	        "assistant": "onDelete",
-			"public": true
-	      },
-	      { "name":"onCapabilitiesChanged",
-	        "assistant":"onCapabilitiesChanged",
-			"public": true
-	      },
-              { "name":"onEnabled",
-                "assistant":"onEnabled",
-                "public":true
-              },
-			  { "name": "sync",
-			    "assistant": "sync",
-				"public": true
-			  },
-              { "name":"onCredentialsChanged",
-                "assistant":"onCredentialsChanged",
-                "public": true
-              },
-              { "name": "loginStateChanged",
-                "assistant":"loginStateChanged",
-                "public": true
-              },
-              { "name": "sendIM",
-                "assistant":"sendIM",
-                "public": true
-              },
-              { "name": "sendCommand",
-                "assistant":"sendCommand",
-                "public": true
-              },
-			  { "name": "startActivity",
-			  "assistant": "startActivity",
-			  "public": true
-			  },
-			  { "name": "adoptActivity",
-			  "assistant": "adoptActivity",
-			  "public": true
-			  },
-			  { "name": "completeActivity",
-			  "assistant": "completeActivity",
-			  "public": true
-			  },
-			  { "name": "cancelActivity",
-			  "assistant": "cancelActivity",
-			  "public": true
-			  },
-			  { "name": "storeMsg",
-			  "assistant": "storeMsg",
-			  "public": true
-			  }
-          ]
+    "id": "com.ericblade.synergv.service",
+    "description": "SynerGV Service",
+    "engine": "node",
+    "activityTimeout": 120,
+    "services":
+	[
+		{ 
+			"name":"com.ericblade.synergv.service",
+			"description": "SynerGV Service",
+			"assistant": "serviceAssistant",
+			"globalized": false,
+			"commands":
+			[
+				{ "name": "checkCredentials", "assistant":"checkCredentials", "public": true },
+				{ "name": "onCreate", "assistant": "onCreate", "public": true },
+				{ "name": "onDelete", "assistant": "onDelete", "public": true },
+				{ "name": "onCapabilitiesChanged", "assistant": "onCapabilitiesChanged", "public": true },
+				{ "name": "onEnabled", "assistant": "onEnabled", "public": true },
+				{ "name": "sync", "assistant": "sync", "public": true },
+				{ "name": "onCredentialsChanged", "assistant": "onCredentialsChanged", "public": true },
+				{ "name": "loginStateChanged", "assistant": "loginStateChanged", "public": true },
+				{ "name": "sendIM", "assistant": "sendIM", "public": true },
+				{ "name": "sendCommands", "assistant": "sendCommand", "public": true },
+				{ "name": "startActivity", "assistant": "startActivity", "public": true },
+				{ "name": "adoptActivity", "assistant": "adoptActivity", "public": true },
+				{ "name": "completeActivity", "assistant": "completeActivity", "public": true },
+				{ "name": "cancelActivity", "assistant": "cancelActivity", "public": true },
+				{ "name": "storeMsg", "assistant": "storeMsg", "public": true },
+				{ "name": "storeConversation", "assistant": "storeConversation", "public": true },
+				{ "name": "syncContacts", "assistant": "syncContacts", "public": true },
+				{ "name": "syncAllAccounts", "assistant": "syncAllAccounts", "public": true },
+				{ "name": "getAccounts", "assistant": "getAccounts", "public": true },
+				{ "name": "getVoiceMessages", "assistant": "getVoiceMessages", "public": true },
+				{ "name": "downloadVoicemail", "assistant": "downloadVoicemail", "public": true },
+				{ "name": "createVoicemailDir", "assistant": "createVoicemailDir", "public": true },
+				{ "name": "deleteVoicemailDir", "assistant": "deleteVoicemailDir", "public": true },
+				{ "name": "httpsRequest", "assistant": "httpsRequest", "public": true },
+				{ "name": "fetchAuthKey", "assistant": "fetchAuthKey", "public": true },
+				{ "name": "getGVSettings", "assistant": "getGVSettings", "public": true },
+				{ "name": "startCall", "assistant": "startCall", "public": true },
+				{ "name": "cancelCall", "assistant": "cancelCall", "public": true },
+				{ "name": "editGeneralSettings", "assistant": "editGeneralSettings", "public": true },
+				{ "name": "setMessageFlag", "assistant": "setMessageFlag", "public": true }
+			]
         }
     ]
 }

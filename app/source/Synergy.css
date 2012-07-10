@@ -1,1 +1,116 @@
 /* Your CSS here */
+.indicator { padding-right: 1px; width: 18px; }
+/*.enyo-toolbar { background-color: #4185C3; }*/
+.dialpadbutton { width: 40px; height: 40px; }
+
+.chat-balloon-received,
+.chat-balloon-sent,
+.chat-balloon-error,
+.chat-balloon-voicemail,
+.chat-balloon-system {
+	margin: 0 7px 0 58px;
+	padding: 5px 10px 6px;
+	min-height: 36px;
+	font-size: 16px;
+	-webkit-border-radius: 9px;
+	word-wrap: break-word;
+	border:none;
+	position:relative;
+}
+.chat-balloon-missed,
+.chat-balloon-received {
+	border: solid 1px #b3d9f2;
+	background-color:#d6edff;
+    margin-left: 10%;
+    margin-right: 0;
+    padding-left: 5px;
+    text-align: right;
+}
+.chat-balloon-placed,
+.chat-balloon-sent {
+	border: solid 1px #d0e1cb;
+	background-color: #dcffd1;
+    margin-right: 10%;
+    margin-left: 0;
+    padding-right: 5px;
+    text-align: left;
+}
+.chat-balloon-voicemail {
+    border: solid 1px #b3d9f2;
+    background-color: #ffcc77;
+    margin: 0;
+    padding: 0;
+}
+.index-selected {
+    -webkit-transition: background 0.4s linear;
+	background: -webkit-gradient(linear, left top, left bottom, from(rgba(218,235,251,0.4)), to(rgba(197,224,249,0.4)));
+}
+
+.message-header {
+    height: auto;
+    max-height: 50px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.page-header {
+    height: auto;
+    max-height: 50px;
+}
+
+.page-picker,
+.header-button,
+.box-picker {
+    margin: 0px;
+    padding: 0px;
+    position: relative;
+    top: -10px;
+}
+
+.page-picker {
+    top: -15px;
+}
+
+.box-picker {
+    min-width: 110px;
+    width: auto;
+}
+
+.default .gvoice-inbox-message-alt { text-align: right; margin-left: 10%; padding-left: 5px; background-color: #DFDFFF !important; }
+.default .gvoice-inbox-index-alt { background-color: #DFDFFF !important; }
+.default .gvoice-inbox-message-self { margin-right: 10%; padding-right: 5px; background-color: #CFCFDF; }
+.list-popup { opacity: 0; }
+
+.menu-toaster {
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+}
+
+.index-unread .index-name,
+.index-unread .index-message,
+.index-unread .index-time
+{
+    font-weight: bold;
+}
+
+.notePopup {
+	text-decoration:none;  
+	color:#000;  
+	background:#ffc;  
+	display:block;  
+	height:10em;  
+	width:10em;  
+	padding:1em;  
+	-webkit-border-image: none;
+	-moz-box-shadow:5px 5px 7px rgba(33,33,33,1);  
+	-webkit-box-shadow: 5px 5px 7px rgba(33,33,33,.7);  
+	box-shadow: 5px 5px 7px rgba(33,33,33,.7);
+}
+
+.notePopup .noteInput {
+	text-decoration:none;  
+	color:#000;  
+	background:#ffc;
+}
+

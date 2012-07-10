@@ -6,5 +6,41 @@
 	"main": "index.html",
 	"title": "SynerGV",
 	"icon": "icon.png",
+	"mimeTypes": [
+		{ "urlPattern": "^http://synergv/" }
+    ],
+	"universalSearch": {
+		"dbsearch": {
+			"displayName": "SynerGV Messages",
+			"url": "com.palm.app.messaging",
+			"launchParam": "message",
+			"launchParamDbField": "conversations",
+			"displayFields":
+				[ "from.addr", "to.addr", "messageText" ],
+			"dbQuery": {
+				"from": "com.ericblade.synergv.immessage:1",
+				"select": [
+					"from.addr", "to.addr", "messageText", "conversations"
+				],
+				"where": [
+					{
+						"prop":"messageText",
+						"op":"?",
+						"val":"",
+						"collate": "primary"
+					}
+				],
+				"orderBy": "localTimestamp",
+				"limit": 20
+			}
+		},
+		"action": {
+			"displayName": "Place call with your Google Voice account",
+            "url": "com.ericblade.synergv",
+            "launchParam": {
+                "cmd": "placecall", "msgId":"#{searchTerms}"
+            }
+		}
+	},
 	"uiRevision":2
 }

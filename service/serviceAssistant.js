@@ -2,9 +2,48 @@
  * I think this might be useful for dealing with some kind of persistent connections? perhaps.
  */
 
-/* At the moment I have no idea how to build this, this line is throwing a "undefined is not a function" */
-//var ServiceAssistant = Transport.ServiceAssistantBuilder({
-    /* Add code here for.. uh.. what? I don't know exactly.. researching how this works, but
-     * there's very little to work with as far as examples go.
-     */
-//});
+serviceAssistant = Class.create({
+    getGVClientForAccount: function(accountId)
+    {
+        var future = new Future;
+        var auth, rnrse, username, password;
+        if(!this.GVClients)
+            this.GVClients = { };
+        if(accountId === undefined) {
+            console.log("getGVClientForAccount received no accountId!!! wtf?");
+            future.result = { returnValue: false };
+            return future;
+        }
+        if(this.GVClients[accountId])
+        {
+            console.log("returning gvclient from pool for " + this.GVClients[accountId].config.email);
+            future.result = { client: this.GVClients[accountId], returnValue: true };
+            return future;
+        }
+        console.log("retrieving new gvclient");
+        future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey",
+                                  { "keyname": "GVAuth:" + accountId }).
+            then(function(f) {
+                auth = Base64.decode(f.result.keydata);
+            }));
+        future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey",
+                                  { "keyname": "GVRNRSE:" + accountId }).
+            then(function(f) {
+                rnrse = Base64.decode(f.result.keydata);
+            }));
+        future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey",
+                                  { "keyname": "GVUsername:" + accountId }).
+            then(function(f) {
+                username = Base64.decode(f.result.keydata);
+            }));
+        future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey",
+                                  { "keyname": "GVPassword:" + accountId }).
+            then(future.callback(this, function(f) {
+                password = Base64.decode(f.result.keydata);
+                console.log("auth details: ", username, password, rnrse, auth);
+                this.GVClients[accountId] = new GV.Client({ email: username, password: password, rnr_se: rnrse, authToken: auth });
+                future.result = { client: this.GVClients[accountId], returnValue: true };
+            })));
+        return future;
+    }
+});

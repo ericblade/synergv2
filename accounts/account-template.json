@@ -4,15 +4,16 @@
     "hidden"                : false,
     "invisible"             : false,
     "icon"                  : { "loc_32x32": "images/gvoice32.png", "loc_48x48": "images/gvoice48.png", "splitter": "images/gvoice32.png" },
-    "readPermissions"       : [ "com.ericblade.synergv", "com.palm.app.messaging", "com.palm.app.phone" ],
-    "writePermissions"      : [ "com.ericblade.synergv", "com.palm.app.messaging", "com.palm.app.phone" ],
+    "readPermissions"       : [ "com.ericblade.synergv", "com.ericblade.synergv.*", "com.palm.app.messaging", "com.palm.app.phone", "com.palm.service.contacts.linker" ],
+    "writePermissions"      : [ "com.ericblade.synergv", "com.ericblade.synergv.*", "com.palm.app.messaging", "com.palm.app.phone" ],
     "validator"		    : "palm://com.ericblade.synergv.service/checkCredentials",
     "capabilityProviders"   : [
                                { "id":"com.ericblade.synergv.account.contacts",
                                   "capability": "CONTACTS",
-                                  "sync": "palm://com.ericblade.synergv.service/sync",
+                                  "sync": "palm://com.ericblade.synergv.service/syncContacts",
+								  "loc_name": "SynerGV Contacts",
                                   "dbkinds": {
-                                      "contact": "com.palm.contact.palmprofile:1"
+                                      "contact": "com.ericblade.synergv.contact:1"
                                   }
                                 },
                                  { "id":"com.ericblade.synergv.account.im",
@@ -39,7 +40,8 @@
                                   "dbkinds": {
                                     "immessage": "com.ericblade.synergv.immessage:1",
                                     "imloginstate": "com.ericblade.synergv.loginstate:1",
-                                    "imcommand": "com.ericblade.synergv.imcommand:1"
+                                    "imcommand": "com.ericblade.synergv.imcommand:1",
+									"configuration": "com.ericblade.synergv.configuration:1"
                                   }
                                 }
                                ]

@@ -2,5 +2,11 @@
     "id": "com.ericblade.synergv.imcommand:1",
     "owner": "com.ericblade.synergv.service",
     "sync": true,
+    "indexes": [
+        {
+            "name": "accountId",
+            "props": [ { "name": "accountId" } ]
+        }    
+    ],
     "extends": [ "com.palm.imcommand:1" ]
 }
