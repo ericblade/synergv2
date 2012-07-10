@@ -1,0 +1,18 @@
+{
+        "id": "com.ericblade.synergv.contact:1",
+        "owner": "com.ericblade.synergv.service",
+        "indexes": [{
+                "name": "accountId",
+                "props": [{
+                        "name": "accountId"
+                }]
+        }, {
+                "name": "accountId_remoteId",
+                "props": [{
+                        "name": "accountId"
+                }, {
+                        "name": "remoteId"
+                }]
+        }],
+        "extends": ["com.palm.contact:1"]
+}
