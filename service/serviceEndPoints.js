@@ -74,7 +74,7 @@ getVoiceMessages = Class.create({
 				    future.result = { returnValue: false, error: error };
 				else
 					future.result = { returnValue: true, messages: response.messages, total: response.total, resultsPerPage: response.resultsPerPage };
-				fs.writeFileSync("/media/internal/gvmessages.json", JSON.stringify(future.result));
+				//fs.writeFileSync("/media/internal/gvmessages.json", JSON.stringify(future.result));
 			});
 		}));
 		return future;
@@ -582,12 +582,17 @@ var storeConversation = Class.create({
 	run: function(future)
 	{
 		var args = this.controller.args;
+		var assistant = this.controller.service.assistant;
+		
 		var msg = args.conv;
 		var msgTexts = [];
 		var msgsToStore = [];
 		var msgsToMerge = [];
-		console.log("storeConversation", JSON.stringify(args));
+		//console.log("storeConversation", JSON.stringify(args));
 
+		args.storeOwn = args.storeOwn || assistant.syncOutgoing;
+		//console.log("syncOutgoing=" + args.storeOwn);
+		
 		if(msg.labels.indexOf("voicemail") !== -1) {
 			msg.messageText = "Voicemail Transcription: (" + msg.duration + " seconds) " + msg.messageText + " --- To listen: http://synergv/playVoicemail/" + args.accountId + "/" + msg.id;
 			msgTexts.push(msg.messageText);
@@ -721,6 +726,9 @@ var sync = Class.create({
 		var username = this.username;
 		var GVclient;
 		
+		args.markMessagesRead = args.markMessagesRead || assistant.markReadOnSync;
+		//console.log("markMessagesRead=" + args.markMessagesRead);
+		
 		console.log("sync run start", JSON.stringify(args));
 		if(args.accountId === undefined) {
 			console.log("sync called with no accountId!!!");
@@ -769,11 +777,13 @@ var sync = Class.create({
 		console.log("setting alarm");
 		syncFuture.nest(PalmCall.call("palm://com.palm.power/timeout/", "set", {
 			key: "SynerGVsync:" + args.accountId,
-			"in": "00:05:00",
+			//"in": "00:05:00",
+			//"in": "00:02:30",
+			"in": assistant.syncTime ? secondsToTime(assistant.syncTime) : "00:05:00",
 			uri: "palm://com.ericblade.synergv.service/sync",
 			params: { accountId: args.accountId }
 		}).then(function(f) {
-			console.log("alarm set result", JSON.stringify(f.result));
+			console.log("alarm set result (" + assistant.syncTime ? secondsToTime(assistant.syncTime) : "00:05:00" + "):", JSON.stringify(f.result));
 		}));
 		var dbResults;
 		syncFuture.nest(DB.find(query, false, false).then(function(f) {
@@ -855,6 +865,7 @@ var sync = Class.create({
 				console.log("***** messages retrieved");
 				if(error){
 					console.log('Error: ',error);
+					console.log('Response: ', response);
 				}else{
 					console.log('There are %s messages in the unread box. The last %s are: ',response.total, response.messages.length);
 					var counter = 0;
@@ -870,7 +881,7 @@ var sync = Class.create({
 			//console.log("All messages:", JSON.stringify(tempMsgs));
 			// TODO: check if there actually are any messages to mark before sending the mark read
 			console.log("****** END OF SYNCFUTURE!!!!!!! Marking read:", JSON.stringify(conversationIds));
-			if(args.markMessagesRead) {
+			if(args.markMessagesRead && conversationIds.length > 0) {
 				GVclient.set('read', { id: conversationIds }, function() {
 					console.log("Messages marked read.");
 				});
@@ -1070,7 +1081,7 @@ var syncContacts = Class.create({
 							c.phoneNumbers.push({ type: type, value: pn.phoneNumber });
                             c.phoneNumbers.push({ type: type, value: pn.displayNumber });
 							//c.ims.push({ serviceName: "type_synergv", type: "type_synergv", label: "Google Voice", value: pn.displayNumber });
-							c.ims.push({ serviceName: "type_synergv", type: "type_synergv", label: "Google Voice", value: pn.phoneNumber });
+							c.ims.push({ serviceName: "type_synergv", type: "type_synergv", label: "type_other", value: pn.phoneNumber });
 						});
 						try {
 							fs.mkdirSync('/media/internal/.synergvimages', 0777);
@@ -1316,7 +1327,7 @@ var getGVSettings = Class.create({
 			var GVclient = f.result.client;
 			GVclient.getSettings(function(err, settings) {
 				future.result = { returnValue: true, settings: settings };
-				fs.writeFileSync("/media/internal/gvsettings.json", JSON.stringify(future.result));
+				//fs.writeFileSync("/media/internal/gvsettings.json", JSON.stringify(future.result));
 			});
 		}));
 		return future;

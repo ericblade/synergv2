@@ -1,11 +1,3 @@
 enyo.depends(
-    "$enyo-lib/accounts/",
-    "source/firmin.js",
-    "source/EnyoOverrides.js",
-    "source/Popups.js",
-    "source/AccountsView.js",
-    "source/VoicemailView.js",
-    "source/TelephoneView.js",
-	"source/Synergy.js",
-	"source/Synergy.css"
+    "launcher/launcher.js"
 );

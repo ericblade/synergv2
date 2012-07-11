@@ -14,6 +14,46 @@ enyo.kind({
 	accountInfoFailed: function(inSender, inResponse) {
 		this.log(inResponse);
 	},
+	toggleSetting: function(inSender) {
+		this.log("toggling", inSender.key, inSender.getState());
+		var params = {};
+		params[inSender.key] = inSender.getState();
+		this.$.Preferences.call(params, { method: "setPreferences" });
+	},
+	prefsSuccess: function(inSender, inResponse, inRequest) {
+		this.log(inResponse);
+		this.log(inRequest);
+		if(inRequest.method == "getPreferences") {
+			if(inResponse.synergvSyncOutgoing === undefined) {
+			    inResponse.synergvSyncOutgoing = false;
+				this.$.Preferences.call({ synergvSyncOutgoing: false }, { method: "setPreferences" });
+			}
+			if(inResponse.synergvMarkReadOnSync === undefined) {
+				inResponse.synergvMarkReadOnSync = true;
+				this.$.Preferences.call({ synergvMarkReadOnSync: true }, { method: "setPreferences" });
+			}
+			if(inResponse.synergvSyncTime === undefined) {
+				inResponse.synergvSyncTime = 5;
+				this.$.Preferences.call({ synergvSyncTime: 5 }, { method: "setPreferences" });
+			}
+			if(inResponse.synergvSyncOutgoing !== undefined)
+				this.$.OutgoingToggle.setState(inResponse.synergvSyncOutgoing);
+			if(inResponse.synergvMarkReadOnSync !== undefined)
+				this.$.MarkReadToggle.setState(inResponse.synergvMarkReadOnSync);
+			if(inResponse.synergvSyncTime !== undefined) {
+			    this.$.SyncTimeSlider.setPosition(inResponse.synergvSyncTime);
+				this.$.SyncTimeCaption.setContent(inResponse.synergvSyncTime + " minute" + (inResponse.synergvSyncTime != 1 ? "s" : ""));
+			}
+		}
+	},
+	syncTimeChanged: function(inSender) {
+		this.log();
+		this.$.Preferences.call({ synergvSyncTime: this.$.SyncTimeSlider.getPosition() }, { method: "setPreferences" });		
+		this.$.SyncTimeCaption.setContent(this.$.SyncTimeSlider.getPosition() + " minute" + (this.$.SyncTimeSlider.getPosition() != 1 ? "s" : ""));
+	},
+	syncTimeChanging: function(inSender) {
+		this.$.SyncTimeCaption.setContent(this.$.SyncTimeSlider.getPosition() + " minute" + (this.$.SyncTimeSlider.getPosition() != 1 ? "s" : ""));		
+	},
 	components: [
 		{ name: "LoadingAccounts", kind: "VFlexBox", components:
 			[
@@ -23,6 +63,7 @@ enyo.kind({
 		},
 		// TODO: we should have a watch on the accounts, if possible, rather than just hoping we catch the accounts done event in here, so if someone adds an account outside the app
 		// while it is running, we update
+		{ name: "Preferences", kind: "PalmService", service: "palm://com.palm.systemservice/", onSuccess: "prefsSuccess", onFailure: "prefsFailure" },
 		{ name: "getAccounts", kind: "PalmService",
 			service: "palm://com.ericblade.synergv.service/", method: "getAccounts",
 			onSuccess: "accountsReceived", onFailure: "accountsFailed", 
@@ -36,68 +77,86 @@ enyo.kind({
 		{kind: "AccountsUI", name: "addAccountView", capability: "MESSAGING", onAccountsUI_Done: "addAccountsDone"},
 		{ name: "AccountsView", kind: "HFlexBox", components:
 			[
-				{ kind: "Spacer", },
-				{ kind: "VFlexBox", components:
+				{ kind: "Scroller", flex: 1, components:
 					[
-						{ kind: "RowGroup", caption: "General Configuration", components:
+						{ kind: "Control", className: "box-center", components:
 							[
-								{ kind: "Item", layoutKind: "HFlexLayout", components:
+								{ kind: "RowGroup", caption: "Tap an account to use - Swipe an account to delete", components:
 									[
-										{ content: "Sync Outgoing Messages", flex: 1 },
-										{ name: "OutgoingToggle", kind: "ToggleButton", onChange: "toggleOutgoing" },
+										{ name: "AccountRepeater", kind: "VirtualRepeater", onclick: "selectAccount", onSetupRow: "setupAccountRow", components:
+											[
+												{ name: "AccountItem", kind: "SwipeableItem", onConfirm: "deleteAccount",
+												  tapHighlight: true, components:
+													[
+														{ kind: "HFlexBox", components:
+															[
+																{ kind: "Image", pack: "center", name: "accountIcon", style: "padding-right: 2px;" },
+																{ kind: "VFlexBox", flex: 1, components:
+																	[
+																		{ name: "accountName" },
+																		{ name: "emailAddress", className: "email-address", flex: 1, },
+																	]
+																}
+															]
+														},
+													]
+												}
+											]
+										},
 									]
 								},
-								{ kind: "Item", layoutKind: "HFlexLayout", components:
+								{ className: "enyo-item-ternary", content: "Adding an account will sync the last 10 Google Voice conversations automatically." },
+								{ className: "enyo-item-ternary", content: "This may take some time to complete, please be patient." },
+								{ className: "enyo-item-ternary", content: "You may add as many accounts as you like, but due to limitations in the Messaging app, you will only be able to send messages from the first account added." },
+								{ kind: "Button", caption: "Add Account", onclick: "addAccount" },
+								{ content: "If you don't have Google Voice(tm) yet, sign up by pressing this:" },
+								{ kind: "Button", caption: "Sign up for Google Voice", onclick: "signup" },
+								{ kind: "RowGroup", caption: "General Configuration", components:
 									[
-										{ content: "Mark Synced Messages Read", flex: 1 },
-										{ name: "MarkReadToggle", kind: "ToggleButton", onChange: "toggleMarkRead" },								
-									]
-								}
-							]
-						},
-						{ kind: "RowGroup", caption: "Tap an account to use - Swipe an account to delete", components:
-							[
-								{ name: "AccountRepeater", kind: "VirtualRepeater", onclick: "selectAccount", onSetupRow: "setupAccountRow", components:
-									[
-										{ name: "AccountItem", kind: "SwipeableItem", onConfirm: "deleteAccount",
-										  tapHighlight: true, components:
+										{ kind: "Item", layoutKind: "VFlexLayout", components:
 											[
-												{ kind: "HFlexBox", components:
+												{ kind: "HFlexBox", align: "center", components:
 													[
-														{ kind: "Image", pack: "center", name: "accountIcon", style: "padding-right: 2px;" },
-														{ kind: "VFlexBox", flex: 1, components:
-															[
-																{ name: "accountName" },
-																{ name: "emailAddress", className: "email-address", flex: 1, },
-															]
-														}
+														{ content: "Sync Outgoing Messages", flex: 1 },
+														{ name: "OutgoingToggle", kind: "ToggleButton", onChange: "toggleSetting", key: "synergvSyncOutgoing" },
+													]
+												},
+												{ className: "enyo-item-ternary", allowHtml: true, content:
+		"Sync sent messages - you may want this if you use other methods to send Google Voice messages, but messages sent from your TouchPad will appear duplicated."},								
+											]
+										},
+										{ kind: "Item", layoutKind: "VFlexLayout", components:
+											[
+												{ kind: "HFlexBox", align: "center", components:
+													[
+														{ content: "Mark Synced Messages Read", flex: 1 },
+														{ name: "MarkReadToggle", kind: "ToggleButton", onChange: "toggleSetting", key: "synergvMarkReadOnSync" },
+													]
+												},
+												{ className: "enyo-item-ternary", allowHtml: true, content:
+		"Mark synced messages Read on the server automatically -- Speeds up future syncs, and conserves battery power." },
+											]
+										},
+										{ kind: "Item", layoutKind: "VFlexLayout", components:
+											[
+												{ content: "Time delay between syncs" },
+												{ className: "enyo-item-ternary", allowHtml: true, content: "A longer delay will result in better battery performance at the expense of longer times between receiving messages" },
+												{ name: "SyncTimeSlider", kind: "Slider", maximum: 30, minimum: 1, position: 5, snap: true, onChange: "syncTimeChanged", onChanging: "syncTimeChanging" },
+												{ kind: "HFlexBox", pack: "center", components:
+													[
+														{ name: "SyncTimeCaption", className: "enyo-item-secondary", content: "5 minutes" },
 													]
 												},
 											]
 										}
 									]
 								},
-								//{ kind: "Accounts.accountsList", name: "accountsList", onAccountsList_AccountSelected: "editAcccount", onAccountsList_Ready: "listReady" },
-								//{ kind: "Accounts.getAccounts", name: "accounts", onGetAccounts_AccountsAvailable: "onAccountsAvailable" },
-								//{ kind: "AccountsUI", name: "AccountsView" },
-								//{ kind: "Accounts.addAccountView", name: "addAccount" },
+								
+								{ name: "BackButton", kind: "Button", caption: "Back to SynerGV", showing: false, onclick: "parentBack", },
 							]
-						},
-						//{ kind: "HFlexBox", components:
-						//	[
-								{ className: "enyo-item-ternary", content: "Adding an account will sync the last 10 Google Voice conversations automatically." },
-								{ className: "enyo-item-ternary", content: "This may take some time to complete, please be patient." },
-								{ className: "enyo-item-ternary", content: "You may add as many accounts as you like, but due to limitations in the Messaging app," },
-								{ className: "enyo-item-ternary", content: "you will only be able to send messages from the first account added." },
-								{ kind: "Button", caption: "Add Account", onclick: "addAccount" },
-						//	]
-						//},
-						{ content: "If you don't have Google Voice(tm) yet, sign up by pressing this:" },
-						{ kind: "Button", caption: "Sign up for Google Voice", onclick: "signup" },
-						{ name: "BackButton", kind: "Button", caption: "Back to SynerGV", showing: false, onclick: "parentBack", },
+						}
 					]
 				},
-				{ kind: "Spacer", },
 			]
 		},
 		{ name: "WebView", kind: "VFlexBox", lazy: true, components:
@@ -115,7 +174,7 @@ enyo.kind({
 		this.$.deleteAccount.call({ accountId: this.accounts[inRow]._id });
 		// time delay to hopefully let us account for the time it takes the system to process the add/remove
 		this.selectViewByName("LoadingAccounts");
-		setTimeout(enyo.bind(this, function() { this.$.getAccounts.call({}); }), 10000);
+		setTimeout(enyo.bind(this, function() { this.$.getAccounts.call({}); }), 15000);
 	},
 	accountDeleted: function(inSender, inEvent, inRequest) {
 		// time delay to hopefully let us account for the time it takes the system to process the add/remove
@@ -158,7 +217,9 @@ enyo.kind({
 		this.inherited(arguments);
 		if(this.parent.history && this.parent.history.length > 0)
 		    this.showBackButton();
+		this.$.Preferences.call({ keys: ["synergvSyncOutgoing", "synergvMarkReadOnSync", "synergvSyncTime" ] }, { method: "getPreferences" });
 	},
+	
 	signup: function() {
 		this.selectViewByName("WebView");
 	},
@@ -168,7 +229,8 @@ enyo.kind({
 	create: function() {
 		this.inherited(arguments);
 		this.$.getAccounts.call({ });
-		this.$.BackButton.hide();
+		if(this.$.BackButton)
+			this.$.BackButton.hide();
 		this.$.templates.getAccountTemplates({ capability: "MESSAGING", capabilitySubtype: "IM", id: "com.ericblade.synergv.account.im" });
 		//this.$.accountsList.getAccountsList();
 		//this.$.accounts.getAccounts();
@@ -197,7 +259,8 @@ enyo.kind({
 		if(!inResults.result.beingDeleted)
 		{
 			this.accounts.push(inResults.result);
-			this.$.AccountRepeater.render();
+			if(this.$.AccountRepeater)
+				this.$.AccountRepeater.render();
 			this.numActiveAccounts++;
 		}
 		this.numAccountsReceived++;

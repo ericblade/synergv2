@@ -9,6 +9,18 @@ serviceAssistant = Class.create({
         var auth, rnrse, username, password;
         if(!this.GVClients)
             this.GVClients = { };
+            
+        var prefsFuture = PalmCall.call("palm://com.palm.systemservice/", "getPreferences",
+                                    {
+                                        keys: [ "synergvSyncOutgoing", "synergvMarkReadOnSync", "synergvSyncTime" ]
+                                    });
+        prefsFuture.then(future.callback(this, function(f) {
+            this.syncOutgoing = !!f.result.synergvSyncOutgoing;
+            this.markReadOnSync = !!f.result.synergvMarkReadOnSync;
+            this.syncTime = f.result.synergvSyncTime || 5;
+            this.syncTime = this.syncTime * 60;
+            console.log("syncOutgoing=" + this.syncOutgoing + " markReadOnSync=" + this.markReadOnSync + " syncTime=" + this.syncTime);   
+        }));
         if(accountId === undefined) {
             console.log("getGVClientForAccount received no accountId!!! wtf?");
             future.result = { returnValue: false };

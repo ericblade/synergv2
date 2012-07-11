@@ -1,3 +1,4 @@
+// TODO: Changing the sync time needs to re-set the alarm time immediately for all accounts
 // TODO: ***** DELETE PERMANENTLY CONFIRM DIALOG *****
 // TODO: button to add as contacts, load contacts into memory at app start, etc
 // TODO: add a button to Email Notifications menu that will open the Voice email configuration page
@@ -43,11 +44,12 @@ enyo.kind({
 		"message": "",
 	},
 	components: [
-		{ name: "gvapi", kind: "PalmService", service: "palm://com.ericblade.synergv.service", onSuccess: "apiSuccess", onFailure: "apiFailure", components:
+		{ name: "gvapi", kind: "PalmService", timeout: 20000, service: "palm://com.ericblade.synergv.service", onSuccess: "apiSuccess", onFailure: "apiFailure", components:
 			[
 				{ name: "setMessageFlag" },
 			]
 		},
+		{ name: "sendDataToShare", kind: "PalmService", service: "palm://com.palm.stservice", method: "shareData", onSuccess: "tapSendSuccess", onFailure: "tapSendFailure" },		
 		{ name: "NotePopup", kind: "NotePopup", className: "notePopup", onNoteSaved: "saveNote" },
 		{ name: "MessageHeader", kind: "Header", className: "message-header", content: "Header", showing: false, },
 		{ name: "MessageContent", allowHtml: true, onclick: "toggleToaster" },
@@ -64,6 +66,7 @@ enyo.kind({
 			locate them in Just Type or the webOS Contacts app, then click on the 'IM' box next to their \
 			Google Voice contact number (not their main phone number)<p>\
 			To bring up options for a message, either tap the message text, or hold down briefly on it's location in the list on the left.<p>\
+			Want to call back a missed call directly from your webOS 2.2+ Pre3 or Veer? Just tap it on the TouchPad's button to place a call to the originator of whatever message is showing in SynerGV.<p>\
 			",
 			className: "chat-balloon-system", flex: 1 },
 		{ name: "ThreadView", kind: "ThreadView", onclick: "toggleToaster", flex: 1, showing: false },
@@ -103,12 +106,7 @@ enyo.kind({
 	openNote: function(inSender, inEvent) {
 		this.$.MenuToaster.close();
 		this.log();
-        /*if(!inSender.messageIndex && !inSender.messageId) {
-            inSender.messageIndex = this.getMessageIndexById(this.selectedID);
-            inSender.messageId = this.selectedID;
-        }*/
         this.$.NotePopup.openAtEvent(inEvent);
-        //this.$.NotePopup.setMessageIndex(inSender.messageIndex);
         this.$.NotePopup.setMessageId(this.message.id);
         this.$.NotePopup.setNote(this.message.note);
         inEvent.preventDefault();
@@ -273,6 +271,24 @@ enyo.kind({
 		this.log("placeCall", this.message.phoneNumber);
 		this.doPlaceCall(inEvent, this.message.phoneNumber);
 		return true;
+	},
+	tapToShare: function() {
+		var labels = this.message && this.message.labels;
+		var bRead = this.message && this.message.isRead;
+		var bArchived = labels && labels.indexOf("inbox") === -1;
+		var bSpam = this.message && this.message.isSpam;
+		var bStar = this.message && this.message.star;
+		var bTrash = this.message && this.message.isTrash;
+		var bNote = this.message && this.message.note != "";
+		var bVoicemail = labels && labels.indexOf("voicemail") !== -1;
+		var bMissed = labels && labels.indexOf("missed") !== -1;
+		var bPlaced = labels && labels.indexOf("placed") !== -1;
+		var bReceived = labels && labels.indexOf("received") !== -1;
+		var bRecorded = labels && labels.indexOf("recorded") !== -1;
+		
+		var dataToSend = { "target": "tel:" + this.message.phoneNumber, "type": "rawdata", "mimetype": "text/html" };
+		this.log("sending url " + dataToSend.target);
+        this.$.sendDataToShare.call({"data": dataToSend});			
 	},
 	messageChanged: function() {
 		/*enyo.log("animating node", this.parent.hasNode());
@@ -514,6 +530,9 @@ enyo.kind({
 			]
 		}
 	],
+	tapToShare: function() {
+		this.$.RightPane.getView().tapToShare();
+	},
 	indexHeld: function(inSender, inEvent) {
 		this.selectIndex(inSender, inEvent);
 		this.$.MessageView.toggleToaster(inSender, inEvent);
@@ -662,6 +681,9 @@ enyo.kind({
 			// reload our settings, after making changes to them
 			this.$.getGVSettings.call({ accountId: enyo.application.accountId });			
 		}
+		this.processCommands();
+	},
+	processCommands: function() {
 		if(enyo.application.accountId && enyo.application.commands.length > 0) {
 			var cmds = enyo.application.commands;
 			for(var x = 0; x < cmds.length; x++) {
@@ -858,6 +880,7 @@ enyo.kind({
 	kind: enyo.VFlexBox,
 
 	components: [
+		{kind: "ApplicationEvents", /*onApplicationRelaunch: "applicationRelaunchHandler",*/ onWindowParamsChange: "applicationRelaunchHandler" },
         { name: "mainSpinner", kind: "SpinnerLarge", style: "position: absolute; top: 45%; left: 45%; z-index: 10;", showing: false },
 		{ name: "getAuthKey", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "fetchAuthKey", onSuccess: "authKeyReceived", onFailure: "authKeyFailed" },
 		{ name: "CreateVoicemailDir", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "createVoicemailDir" },
@@ -941,6 +964,12 @@ enyo.kind({
 	toggleAnnounceCaller: function() {
 		this.$.MainView.changeGeneralSettings({ announceCaller: 1 });
 	},
+	tapSendSuccess: function(inSender, inResponse, inRequest) {
+		this.log(inResponse);
+	},
+	tapSendFailure: function(inSender, inError, inRequest) {
+		this.log(inError);
+	},
 	create: function() {
 		enyo.application.commands = [ ];
 		this.inherited(arguments);
@@ -956,6 +985,10 @@ enyo.kind({
 				this.$.mainSpinner.hide();
 			}
 		});
+	},
+	applicationRelaunchHandler: function(inSender) {
+		this.log(enyo.windowParams);
+		this.processWindowParams(enyo.windowParams);
 	},
 	syncList: function(inSender, inEvent) {
 		this.$.MainView.syncList();
@@ -999,9 +1032,16 @@ enyo.kind({
 			msgId = params.msgId;
 		if(cmd !== "") {
 			enyo.application.commands.push({ cmd: cmd, accountId: accountId, msgId: msgId });
+			if(accountId !== undefined && enyo.application.accountId == accountId)
+				this.$.MainView.processCommands();
 		}
 		if(accountId !== "") {
 			enyo.application.desiredAccountId = accountId;
+		}
+		
+		if(params.sendDataToShare !== undefined) {
+			this.$.MainPane.getView().tapToShare();
+			return true;
 		}
 	},
 	callVoicemail: function(inSender, inEvent) {
@@ -1210,3 +1250,4 @@ enyo.kind({
 // TODO: audit the commented out Email Notifications options to be sure that these can even be changed reliably .. it ain't working right.
 // I can have Missed Calls or Text Messages, but not both, and the Voicemail isn't working at all
 // TODO: when clicking on a voicemail as the first message loaded, it may not appear formatted properly? wth
+// TODO: Commands sent to an account other than the one currently in use would be ignored. Should add the ability to specify an accountId to the accounts view, have it locate the account, and then select it, which would then trigger the commands to run.

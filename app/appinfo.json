@@ -42,5 +42,7 @@
             }
 		}
 	},
+	"noWindow": true,
+	"tapToShareSupported": true,
 	"uiRevision":2
 }
