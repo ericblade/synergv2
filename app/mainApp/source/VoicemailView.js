@@ -135,10 +135,13 @@ enyo.kind({
 	voicemailDownloaded: function(inSender, inResponse, inRequest) {
 		enyo.scrim.hide();
 		this.downloading = false;
-		this.log("voicemailDownloaded", JSON.stringify(inResponse.file));
-		this.$.SoundPlayer.setSrc(inResponse.file);
-		this.$.SoundPlayer.play();
-		this.playerInterval = setInterval(enyo.bind(this, this.playerTimer), 500); 		
+		this.log("voicemailDownloaded", inResponse.file);
+		if(inResponse.file != this.$.SoundPlayer.src) {
+			this.$.SoundPlayer.audio.pause();
+			this.$.SoundPlayer.setSrc(inResponse.file);
+			this.$.SoundPlayer.play();
+			this.playerInterval = setInterval(enyo.bind(this, this.playerTimer), 500);
+		}
 	},
 	voicemailFailed: function(inSender, inError, inRequest) {
 		enyo.scrim.hide();

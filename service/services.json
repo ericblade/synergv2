@@ -43,7 +43,8 @@
 				{ "name": "editGeneralSettings", "assistant": "editGeneralSettings", "public": true },
 				{ "name": "setMessageFlag", "assistant": "setMessageFlag", "public": true },
 				{ "name": "getBillingCredit", "assistant": "getBillingCredit", "public": true },
-				{ "name": "setContactInfo", "assistant": "setContactInfo", "public": true }
+				{ "name": "setContactInfo", "assistant": "setContactInfo", "public": true },
+				{ "name": "syncDeleted", "assistant": "syncDeleted", "public": true }
 			]
         }
     ]

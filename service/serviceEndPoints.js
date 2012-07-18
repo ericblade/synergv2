@@ -6,7 +6,6 @@
 // TODO: we can "syncAllAccounts" now, why don't we just set that up to run on the timer, instead of an individual sync per account?
 // TODO: how can we sync contacts added from the webOS app back to google?
 // TODO: If sync() returned it's messages, we could use sync() instead of getVoiceMessages() in the app, and then it would automatically sync the messaging app .. ?
-// TODO: all the "var data = JSON.parse()" lines could fail if the error is, for example, an argument error, that never went to the server, must clean up
 // TODO: should also validate all of those error handlers, setMessageFlag() seems to do it right, the others might not
 
 // Does deleting an account delete contacts??
@@ -40,6 +39,7 @@
 // TODO: explore seperating people's names into presumably first/middle/lasts before dropping them
 //		into the contacts database
 
+// var Class;
 require.paths.push("./");
 require.paths.push("./node_modules");
 require.paths.push("./node_modules/jsdom");
@@ -60,7 +60,7 @@ try {
 
 // TODO: we need to disable/cancel our Activity at onEnable with enabled: false
 
-getVoiceMessages = Class.create({
+var getVoiceMessages = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
 		var assistant = this.controller.service.assistant;
@@ -68,10 +68,12 @@ getVoiceMessages = Class.create({
 			var GVclient = f.result.client;
 			var start = ( ((args.page || 1) - 1) * 10) + 1;
 			GVclient.get(args.inbox || 'inbox', { start: start, limit: 10 }, function(error, response) {
-				if(error)
-				    future.result = { returnValue: false, error: error };
-				else
+				if(error) {
+					future.result = { returnValue: false, error: error };
+				}
+				else {
 					future.result = { returnValue: true, messages: response.messages, total: response.total, resultsPerPage: response.resultsPerPage };
+				}
 				//fs.writeFileSync("/media/internal/gvmessages.json", JSON.stringify(future.result));
 			});
 		}));
@@ -79,7 +81,7 @@ getVoiceMessages = Class.create({
 	}
 });
 					
-checkCredentials = Class.create({
+var checkCredentials = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
 		var assistant = this.controller.service.assistant;
@@ -113,8 +115,8 @@ checkCredentials = Class.create({
 							{
 								password: args.password,
 								auth: GVclient.auth.getAuthId(),
-								rnrse: GVclient.config.rnr_se,
-							},
+								rnrse: GVclient.config.rnr_se
+							}
 						},
 						config:
 						{
@@ -137,11 +139,11 @@ checkCredentials = Class.create({
 	}
 });
 
-getAccounts = Class.create({
+var getAccounts = Class.create({
 	run: function(future) {
 		var dbQuery = {
 			select: [ "accountId" ],
-			from: "com.ericblade.synergv.configuration:1",
+			from: "com.ericblade.synergv.configuration:1"
 		};
 		future.nest(DB.find(dbQuery, false, false).then(function(f) {
 			var dbResults = f.result.results;
@@ -153,9 +155,9 @@ getAccounts = Class.create({
 			future.result = { returnValue: true, accounts: ret };
 		}));
 	}
-})
+});
 
-onCreate = Class.create({
+var onCreate = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
 
@@ -192,7 +194,15 @@ onCreate = Class.create({
 					read: "allow",
 					create: "allow",
 					"delete": "allow",
-					update: "allow",
+					update: "allow"
+				}
+			},
+			{
+				type: "db.kind",
+				object: "com.ericblade.synergv.configuration:1",
+				caller: "com.ericblade.*",
+				operations: {
+					read: "allow", create: "allow", "delete": "allow", update: "allow"
 				}
 			}
 		];
@@ -214,12 +224,12 @@ onCreate = Class.create({
 				if (f.result.returnValue === true)
 				{
 					PalmCall.call("palm://com.palm.keymanager/", "store", keystore2).then( function(f2) 
-				   {
-					  future.result = f2.result;
-				   });
+					{
+						future.result = f2.result;
+					});
 				}
-				else   {
-				   future.result = f.result;
+				else {
+					future.result = f.result;
 				}
 			});			
 		});
@@ -230,34 +240,37 @@ onCreate = Class.create({
 // TODO: Make sure this deletes any stored data, IMs, and stuff.
 // actually, all the removal is supposed to happen when disabling, according to the palm docs
 
-onDelete = Class.create({
+var onDelete = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
 		console.log("onDelete", JSON.stringify(args));
 		if(args.accountId !== undefined) {
 			PalmCall.call("palm://com.palm.keymanager/", "remove",
-						  { keyname: "GVUsername:" + args.accountId });
+							{ keyname: "GVUsername:" + args.accountId });
 			PalmCall.call("palm://com.palm.keymanager/", "remove",
-						  { keyname: "GVPassword:" + args.accountId });
+							{ keyname: "GVPassword:" + args.accountId });
 			PalmCall.call("palm://com.palm.keymanager/", "remove",
-						  { keyname: "GVAuth:" + args.accountId });
+							{ keyname: "GVAuth:" + args.accountId });
 			PalmCall.call("palm://com.palm.keymanager/", "remove",
-						  { keyname: "GVRNRSE:" + args.accountId });
+							{ keyname: "GVRNRSE:" + args.accountId });
 			PalmCall.call("palm://com.palm.db/", "del",
-						  {
-							query: {
-								from: "com.ericblade.synergv.configuration:1",
-								"where": [
-										  {
-											prop:"accountId",
-											op: "=",
-											val: args.accountId
-										}]
+							{
+								query: {
+									from: "com.ericblade.synergv.configuration:1",
+									"where":
+										[
+											{
+												prop:"accountId",
+												op: "=",
+												val: args.accountId
+											}
+										]
+								}
 							}
-						  });
+						);
 		}
 		DB.del({ from: "com.ericblade.synergv.loginstate:1" }).then(function(fut) {
-			future.result = fut.result
+			future.result = fut.result;
 		});
 	}
 });
@@ -270,7 +283,7 @@ var onCapabilitiesChanged = function(future) {};
 // TODO: we should probably implement this
 onCapabilitiesChanged.prototype.run = function(future) {
     console.log("onCapabilitiesChanged");
-}
+};
  
 var onCredentialsChanged = function(future) {};
 
@@ -307,7 +320,12 @@ var sendIM = Class.create({
 				outgoingNumber: args.to,
 				text: args.text
 			}, function(error, response, body) {
-				var data = JSON.parse(body);
+				var data;
+				try {
+					data = JSON.parse(body);
+				} catch(err) {
+					data = {};
+				}
 				var status = "permanent-fail";
 				var errormsg = "";
 				if(error || !data.ok) {
@@ -379,7 +397,7 @@ sendCommand.prototype.run = function(future) {
 	future.result = { returnValue: true };
 };
 
-onEnabled = Class.create({
+var onEnabled = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
 		console.log("onEnabled args=", JSON.stringify(args));
@@ -416,7 +434,7 @@ onEnabled = Class.create({
 				var accountInfo = f.result.result;
 				var serviceName = "";
 				for(var x = 0; x < accountInfo.capabilityProviders.length; x++) {
-					if(accountInfo.capabilityProviders[x].capability == "MESSAGING") {
+					if(accountInfo.capabilityProviders[x].capability === "MESSAGING") {
 						serviceName = accountInfo.capabilityProviders[x].serviceName;
 					}
 				}
@@ -528,19 +546,19 @@ var completeActivity = Class.create({
 			// someone else said reset the callback to a different function .. to avoid the "Temporarily Not Available" problem
 			// other people say you do. so let's try it.
 			trigger: {
-			  key: "fired",
-			  method: "palm://com.palm.db/watch",		  
-			  params: {
-				  query: {
-					  from: "com.ericblade.synergv.immessage:1",
-					  where:
-					  [
-						  { "prop":"folder", "op":"=", "val":"outbox" },
-						  { "prop":"status", "op":"=", "val":"pending" }, 
-					  ]
-				  },
-				  subscribe: true
-			  },
+				key: "fired",
+				method: "palm://com.palm.db/watch",
+				params: {
+					query: {
+						from: "com.ericblade.synergv.immessage:1",
+						where:
+						[
+							{ "prop":"folder", "op":"=", "val":"outbox" },
+							{ "prop":"status", "op":"=", "val":"pending" }
+						]
+					},
+					subscribe: true
+				}
 			}
 		}).then(function(f) {
 			console.log("completeActivity result", JSON.stringify(f.result));
@@ -554,7 +572,7 @@ var cancelActivity = Class.create({
 	{
 		var args = this.controller.args;
 		PalmCall.call("palm://com.palm.service.accounts/", "getAccountInfo", { accountId: args.accountId }).then(function(f) {
-			console.log("Cancelling activity for accountId")
+			console.log("Cancelling activity for accountId");
 			PalmCall.call("palm://com.palm.activitymanager/", "cancel", {
 				activityName: "SynerGVOutgoingSync:" + args.accountId
 			}).then(function(fut) {
@@ -608,13 +626,13 @@ var storeConversation = Class.create({
 			select: [ "messageText" ],
 			where: [
 				{ prop: "gConversationId", op: "=", val: msg.id },
-				{ prop: "messageText", op: "=", val: msgTexts },
+				{ prop: "messageText", op: "=", val: msgTexts }
 			]
 		};
 		future.nest(DB.find(dbquery, false, false).then(function(f) {
 			var dbResults = f.result.results;
 			PalmCall.call("palm://com.palm.service.accounts/", "getAccountInfo",
-						  { accountId: args.accountId }).
+							{ accountId: args.accountId }).
 			then(function(accountFuture) {
 				var username = accountFuture.result.result.username;
 				console.log("storeConversation for account", username);
@@ -623,7 +641,7 @@ var storeConversation = Class.create({
 					msg.thread.forEach(function(sms, index) {
 						var bFound = false;
 						for(var x = 0; x < dbResults.length; x++) {
-							if(dbResults[x].messageText == sms.text)
+							if(dbResults[x].messageText === sms.text)
 							{
 								bFound = true;
 								break;
@@ -634,29 +652,32 @@ var storeConversation = Class.create({
 							var dbMsg = {
 								_kind: "com.ericblade.synergv.immessage:1",
 								accountId: args.accountId,
-								localTimestamp: parseInt(msg.startTime),
-								timestamp: parseInt(msg.startTime),
-								folder: sms.from == "Me:" ? "outbox" : "inbox",
+								localTimestamp: parseInt(msg.startTime, 10),
+								timestamp: parseInt(msg.startTime, 10),
+								folder: sms.from === "Me:" ? "outbox" : "inbox",
 								status: "successful",
 								messageText: sms.text,
 								//from: { addr: sms.from == "Me:" ? username : msg.displayNumber }, // TODO: use sms.from ? also get account Name
-								from: { addr: sms.from == "Me:" ? username : msg.phoneNumber },
+								from: { addr: sms.from === "Me:" ? username : msg.phoneNumber },
 								// to: [ { addr: sms.from == "Me:" ? msg.displayNumber : username } ], // TODO: use sms.from? also get account Name
-								to: [ { addr: sms.from == "Me:" ? msg.phoneNumber : username } ],
+								to: [ { addr: sms.from === "Me:" ? msg.phoneNumber : username } ],
 								serviceName: "type_synergv",
 								username: username,
 								gConversationId: msg.id,
+								delProcessed: false
 							};
-							if(sms.from == "Me:" && args.storeOwn == false)
+							if(sms.from === "Me:" && !args.storeOwn) {
 								msgsToMerge.push(dbMsg);
-							else
+							}
+							else {
 								msgsToStore.push(dbMsg);
+							}
 						}
 					});
 				} else {
 					var bFound = false;
 					for(var x = 0; x < dbResults.length; x++) {
-						if(dbResults[x].messageText == msg.messageText)
+						if(dbResults[x].messageText === msg.messageText)
 						{
 							bFound = true;
 							break;
@@ -666,8 +687,8 @@ var storeConversation = Class.create({
 						var dbMsg = {
 							_kind: "com.ericblade.synergv.immessage:1",
 							accountId: args.accountId,
-							localTimestamp: parseInt(msg.startTime),
-							timestamp: parseInt(msg.startTime),
+							localTimestamp: parseInt(msg.startTime, 10),
+							timestamp: parseInt(msg.startTime, 10),
 							folder: "inbox",
 							status: "successful",
 							messageText: msg.messageText,
@@ -676,7 +697,8 @@ var storeConversation = Class.create({
 							to: [ { addr: username } ],
 							serviceName: "type_synergv",
 							username: username,
-							gConversationId: msg.id
+							gConversationId: msg.id,
+							delProcessed: false
 						};
 						msgsToStore.push(dbMsg);
 					}
@@ -693,7 +715,7 @@ var storeConversation = Class.create({
 			// figure out how to update the outgoing message gConversationId in the local database... but.. screw it for now.
 		});
 	}
-})
+});
 
 var sync = Class.create({
 	run: function(syncFuture) {
@@ -706,15 +728,15 @@ var sync = Class.create({
 		var msgTexts = [];
 		var username = this.username;
 		var GVclient;
-		
+	
 		args.markMessagesRead = args.markMessagesRead || assistant.markReadOnSync;
-		
+		args.inbox = args.inbox || (assistant.syncInbox === true ? "inbox" : undefined); 
 		console.log("sync run start", JSON.stringify(args));
 		if(args.accountId === undefined) {
 			console.log("sync called with no accountId!!!");
 			var actname = args.$activity.name;
 			var x = actname.indexOf(":");
-			if(x == -1) {
+			if(x === -1) {
 				console.log("unable to pull accountId from activity");
 				syncFuture.result = { returnValue: false };
 				return syncFuture;
@@ -737,21 +759,20 @@ var sync = Class.create({
 			return;
 		}*/
 		var query = {
-					  from: "com.ericblade.synergv.immessage:1",
-					  orderBy: "_rev",
-					  desc: true,
-					  where:
-					  [
-						  { "prop":"folder", "op":"=", "val":"outbox" },
-						  { "prop":"status", "op":"=", "val":"pending" },
-					  ]
-				  };
-				  
-				  // TODO: we really really need to store lastRev in the database somewhere and pull it up on initialization
-				  // TODO: of course, we also need to attempt to get our GV client up at initialization as well
+						from: "com.ericblade.synergv.immessage:1",
+						orderBy: "_rev",
+						desc: true,
+						where:
+						[
+							{ "prop":"folder", "op":"=", "val":"outbox" },
+							{ "prop":"status", "op":"=", "val":"pending" }
+						]
+					};
+				// TODO: we really really need to store lastRev in the database somewhere and pull it up on initialization
+				// TODO: of course, we also need to attempt to get our GV client up at initialization as well
 		if(assistant.lastRev !== undefined && assistant.lastRev !== "undefined")
 		{
-		    query.where.push({ "prop": "_rev", "op":">", "val": this.controller.service.assistant.lastRev });
+			query.where.push({ "prop": "_rev", "op":">", "val": this.controller.service.assistant.lastRev });
 		}
 		
 		console.log("setting alarm");
@@ -768,6 +789,7 @@ var sync = Class.create({
 		var dbResults;
 		syncFuture.nest(DB.find(query, false, false).then(function(f) {
 			dbResults = f.result.results;
+
 			syncFuture.nest(assistant.getGVClientForAccount(args.accountId).then(function(fut) {
 				GVclient = fut.result.client;
 				PalmCall.call("palm://com.palm.service.accounts/", "getAccountInfo", { accountId: args.accountId }).then(function(fut) {
@@ -776,18 +798,24 @@ var sync = Class.create({
 					f.result = { returnValue: true };
 				});
 			}));
+		}).then(function(f) {
+			PalmCall.call("palm://com.ericblade.synergv.service/", "syncDeleted", { accountId: args.accountId }).then(function(fut) {
+				fut.result = { returnValue: true };
+				f.result = { returnValue: true };
+			});
 		}).
-			then(function(f) {
+		then(function(f) {
 			var results = dbResults;
+
 			//console.log("pending message search result=", JSON.stringify(results));
-			if(results.length == 0) {
+			if(results.length === 0) {
 				f.result = { returnValue: true };
 			}
 			for(var x = 0; x < results.length; x++) {
-				if(assistant.lastRev === undefined || assistant.lastRev < results[x]["_rev"])
+				if(assistant.lastRev === undefined || assistant.lastRev < results[x]._rev)
 				{
 					console.log("new lastRev=", assistant.lastRev);
-					assistant.lastRev = results[x]["_rev"];
+					assistant.lastRev = results[x]._rev;
 				}
 				//console.log("outgoing msg from", results[x].from.addr, "comparing to", username);
 				if(results[x].from.addr !== username)
@@ -795,26 +823,26 @@ var sync = Class.create({
 					continue;
 				}
 				f.nest(PalmCall.call("palm://com.ericblade.synergv.service/", "sendIM", {
-					msgId: results[x]["_id"],
+					msgId: results[x]._id,
 					accountId: args.accountId,
 					to: results[x].to[0].addr,
 					text: results[x].messageText
-				}).then(function(fut) {
+				}).then(function(fut) { // TODO: "don't make functions in a loop"
 					if(fut.result.returnValue === true)
 					{
-						if(fut.result.status != "successful") {
+						if(fut.result.status !== "successful") {
 							var dbMsg = {
 								_kind: "com.ericblade.synergv.immessage:1",
 								accountId: args.accountId,
-								localTimestamp: parseInt(new Date().getTime()),
-								timestamp: parseInt(new Date().getTime()),
+								localTimestamp: parseInt(new Date().getTime(), 10),
+								timestamp: parseInt(new Date().getTime(), 10),
 								folder: "system",
 								status: "successful",
 								messageText: "Message send failure, code: " + fut.result.errorcode + " error msg: " + fut.result.errormsg,
 								from: { addr: fut.result.destination },
 								to: [ { addr: username } ], 
 								serviceName: "type_synergv",
-								username: username,
+								username: username
 								//gConversationId: msg.id
 							};
 							DB.put([ dbMsg ]);
@@ -872,8 +900,12 @@ var sync = Class.create({
 		var activity = args.$activity;
 		//console.log("sync complete starting", JSON.stringify(args));
 		//console.log("activity received was", JSON.stringify(activity));
-		if(args.accountId === undefined) return;
-		if(activity === undefined) return;
+		if(args.accountId === undefined) {
+			return;
+		}
+		if(activity === undefined) {
+			return;
+		}
 		var newact = {
 			//activityName: "SynerGVOutgoingSync",
 			activityId: activity.activityId,
@@ -882,20 +914,20 @@ var sync = Class.create({
 			// someone else said reset the callback to a different function .. to avoid the "Temporarily Not Available" problem
 			// other people say you do. so let's try it.
 			trigger: {
-			  key: "fired",
-			  method: "palm://com.palm.db/watch",		  
-			  params: {
-				  query: {
-					  from: "com.ericblade.synergv.immessage:1",
-					  where:
-					  [
-						  { "prop":"folder", "op":"=", "val":"outbox" },
-						  { "prop":"status", "op":"=", "val":"pending" },
-					  ],
-					  limit: 1
-				  },
-				  subscribe: true
-			  },
+				key: "fired",
+				method: "palm://com.palm.db/watch",
+				params: {
+					query: {
+						from: "com.ericblade.synergv.immessage:1",
+						where:
+						[
+							{ "prop":"folder", "op":"=", "val":"outbox" },
+							{ "prop":"status", "op":"=", "val":"pending" }
+						],
+						limit: 1
+					},
+					subscribe: true
+				}
 			}
 		};
 		if(this.controller.service.assistant && this.controller.service.assistant.lastRev)
@@ -905,8 +937,66 @@ var sync = Class.create({
 		PalmCall.call("palm://com.palm.activitymanager/", "complete",  newact).then(function(f) {
 			//console.log("sync complete completed", JSON.stringify(f.result));
 			f.result = { returnValue: true };
-		})
+		});
 	}	
+});
+
+var syncDeleted = Class.create({
+	run: function(future) {
+		var assistant = this.controller.service.assistant;
+		var args = this.controller.args;
+		var msgIds = [];
+		var gConvIds = [];
+
+		console.log("Syncing Deleted Messages");
+		args.accountId = args.accountId || "++I3z3oKwiwVdHsD";
+		var query = {
+						from: "com.ericblade.synergv.immessage:1",
+						incDel: true,
+						// selecting doesn't allow us to get the _del field .. dammit
+						//select: [ "_id", "gConversationId", "_del" ],
+						where:
+						[
+							{ "prop":"accountId", "op":"=", "val":args.accountId },
+							{ "prop":"delProcessed", "op":"=", "val":false }
+						]
+					};
+		console.log("query=" + JSON.stringify(query));
+		DB.find(query, false, false).then(function(f) {
+			//console.log("db result=", JSON.stringify(f.result.results));
+			var dbr = f.result.results;
+			for(var x = 0; x < dbr.length; x++) {
+				if(dbr[x]._del) {
+					msgIds.push({ "_id": dbr[x]._id, "delProcessed": true});
+					if(gConvIds.indexOf(dbr[x].gConversationId) == -1)
+					{
+						console.log("should archive " + dbr[x].gConversationId);
+						gConvIds.push(dbr[x].gConversationId);
+					}
+				}
+			}
+			if(msgIds.length > 0) {
+				DB.merge(msgIds);
+			}
+			if(gConvIds.length > 0) {
+				if(assistant.deleteAction == "Archive") {
+					PalmCall.call("palm://com.ericblade.synergv.service/", "setMessageFlag", {
+						accountId: args.accountId,
+						flag: "archive",
+						id: gConvIds
+					}).then(function(f) {
+						future.result = { returnValue: true };
+						f.result = { returnValue: true };
+					});
+				} else {
+					future.result = { returnValue: true };
+				}
+			} else {
+				future.result = { returnValue: true };
+			}
+		});
+		return future;
+	}
 });
 
 /*var storeMsg = Class.create({
@@ -1032,7 +1122,7 @@ var syncContacts = Class.create({
 							phoneNumbers: [], // filled in later
 							ims: [], // filled in later
 							emails: [], // filled in later
-							photos: [], // filled in later
+							photos: [] // filled in later
 						};
 						contact.emails.forEach(function(em, index) {
 							c.emails.push({
@@ -1165,7 +1255,9 @@ function deleteDirRecursive(path, failSilent) {
     try {
         files = fs.readdirSync(path);
     } catch (err) {
-        if(failSilent) return;
+        if(failSilent) {
+			return;
+		}
         throw new Error(err.message);
     }
 
@@ -1173,20 +1265,23 @@ function deleteDirRecursive(path, failSilent) {
     for(var i = 0; i < files.length; i++) {
         var currFile = fs.lstatSync(path + "/" + files[i]);
 
-        if(currFile.isDirectory()) // Recursive function back to the beginning
+        if(currFile.isDirectory()) { // Recursive function back to the beginning
             exports.rmdirSyncRecursive(path + "/" + files[i]);
+		}
 
-        else if(currFile.isSymbolicLink()) // Unlink symlinks
+        else if(currFile.isSymbolicLink()) { // Unlink symlinks
             fs.unlinkSync(path + "/" + files[i]);
+		}
 
-        else // Assume it's a file - perhaps a try/catch belongs here?
+        else {// Assume it's a file - perhaps a try/catch belongs here?
             fs.unlinkSync(path + "/" + files[i]);
+		}
     }
 
     /*  Now that we know everything in the sub-tree has been deleted, we can delete the main
         directory. Huzzah for the shopkeep. */
     return fs.rmdirSync(path);
-};
+}
 
 var deleteVoicemailDir = Class.create({
 	run: function(future) {
@@ -1198,10 +1293,10 @@ var deleteVoicemailDir = Class.create({
 var httpsRequest = Class.create({
 	run: function(future)
 	{
+		var args = this.controller.args;
 		if(https === undefined)
 		{
 			console.log("https using curl?");
-			var args = this.controller.args;
 			var host = args.host || "www.google.com";
 			var port = args.port || "443";
 			var path = args.path || "/";
@@ -1219,8 +1314,9 @@ var httpsRequest = Class.create({
 					cmd += ' -H "' + h + ':' + args.headers[h] + '"';
 				}
 			}
-			if(args.savefile)
+			if(args.savefile) {
 				cmd += " -s -o " + args.savefile;
+			}
 	
 			cmd += " " + url;
 			console.log("Download command: " + cmd);
@@ -1230,11 +1326,9 @@ var httpsRequest = Class.create({
 			return;
 		}
 		console.log("https using node");
-		/* Copy the arguments passed in from the PalmService call */
-		var args = this.controller.args;
-		/* We're going to be receiving a bunch of data over time, this will cache it
-		 * all until we're done
-		 */
+			/* We're going to be receiving a bunch of data over time, this will cache it
+			* all until we're done
+			*/
 		var recdata = "";
 		/* Set our connection options */
 		var options = {
@@ -1244,67 +1338,71 @@ var httpsRequest = Class.create({
 			method: args.method ? args.method : "GET"
 		};
 		/* If client passed us headers, set them */
-		if(args.headers)
+		if(args.headers) {
 			options.headers = args.headers;
+		}
 		/* NOW: start a https request, this will sit here and wait until the "end"
-		 * callback is triggered
-		 */
+		* callback is triggered
+		*/
 		future.now(function(thisfuture) {
 			/* Some logging to make sure we're alive -- tail -f /var/log/messages to
-			 * watch for service logs
-			 */
+			* watch for service logs
+			*/
 			console.log("HOST:", options.host, "PORT:", options.port);
 			/* Call to the Node library to perform the https request -- This will
-			 * not actually start processing until we fire request.end()
-			 */
+			* not actually start processing until we fire request.end()
+			*/
 			var request = https.request(options,
 				function(result) {
 					/* When we receive data, concat it to the recdata cache, throw a
-					 * log just so the operator can see we're alive
-					 */
+					* log just so the operator can see we're alive
+					*/
 					result.on("data",
 						function(data) {
 							recdata += data;
-							console.log("received some data")
+							console.log("received some data");
 						}
 					);
-					if(args.binary)
+					if(args.binary) {
 						result.setEncoding('binary');
+					}
 					/* The future will not return until we set thisfuture.result,
-					 * which we'll do when we receive the "end" from the https
-					 * request
-					 */
+					* which we'll do when we receive the "end" from the https
+					* request
+					*/
 					result.on("end",
 						function() {
 							console.log("received end of data");
-							if(args.savefile)
+							if(args.savefile) {
 								fs.writeFileSync(args.savefile, recdata, args.binary ? 'binary' : 'utf8');
-							thisfuture.result = { data: recdata, file: args.savefile, returnValue: true }
+							}
+							thisfuture.result = { data: recdata, file: args.savefile, returnValue: true };
 						}
 					);
 					/* Connection closed before we got an end? Let's see what data
-					 * we did get.
-					 * www.google.com gives me this event, while developer.palm.com
-					 * gives me a proper "end"
-					 */
+					* we did get.
+					* www.google.com gives me this event, while developer.palm.com
+					* gives me a proper "end"
+					*/
 					result.on("close",
 						function() {
 							console.log("received connection closed");
-							if(args.savefile)
+							if(args.savefile) {
 								fs.writeFileSync(args.savefile, recdata, args.binary ? 'binary' : 'utf8');
-							thisfuture.result = { data: recdata, file: args.savefile, returnValue: true }
+							}
+							thisfuture.result = { data: recdata, file: args.savefile, returnValue: true };
 						}
 					);
 				});
 			/* Once we have the pending request object, if we have data to send,
-			 * then send it
-			 */
-			if(options.method == "POST" && options.postdata) {
+			* then send it
+			*/
+			if(options.method === "POST" && options.postdata) {
 				request.write(querystring.stringify(options.postdata));
 			}
 			/* Flag that the request is all setup, and now Node will fire it */
 			request.end();
-		})    
+		});  
 	}
 });
 
@@ -1320,7 +1418,7 @@ var fetchAuthKey = Class.create({
 		});
 		return future;
 	}
-})
+});
 
 var getGVSettings = Class.create({
 	run: function(future) {
@@ -1346,7 +1444,12 @@ var startCall = Class.create({
 		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
 			var GVclient = f.result.client;
 			GVclient.connect('call',{outgoingNumber:args.outgoingNumber, forwardingNumber:args.forwardingNumber, phoneType:args.phoneType}, function(error, response, body){
-				var data = JSON.parse(body);
+				var data;
+				try {
+					data = JSON.parse(body);
+				} catch(err) {
+					data = {};
+				}
 				if(error || !data.ok){
 					console.log('Error: ', error, ', response: ', body);
 					future.result = { returnValue: false, error: error };
@@ -1384,7 +1487,12 @@ var editGeneralSettings = Class.create({
 			console.log("sending with client ", JSON.stringify(f.result.client));
 			var client = f.result.client;
 			client.connect('settings', args.options, function(error, response, body) {
-				var data = JSON.parse(body);
+				var data;
+				try {
+					data = JSON.parse(body);
+				} catch(err) {
+					data = {};
+				}
 				var errormsg = "";
 				if(error || !data.ok) {
 					console.log("Error: ", error);
@@ -1401,7 +1509,7 @@ var editGeneralSettings = Class.create({
 		}));
 		
 		return future;
-	},
+	}
 });
 
 var setMessageFlag = Class.create({
@@ -1414,27 +1522,38 @@ var setMessageFlag = Class.create({
 			var client = f.result.client;
 			var options = { };
 			options.id = args.id;
-			if(args.note)
+			if(args.note) {
 				options.note = args.note;
-			if(args.transcript)
+			}
+			if(args.transcript) {
 				options.transcript = args.transcript; // TODO: saveTranscript ?! neat
-			if(args.email)
+			}
+			if(args.email) {
 				options.email = args.email;
-			if(args.subject && args.email)
+			}
+			if(args.subject && args.email) {
 				options.subject = args.subject;
-			if(args.body && args.email)
+			}
+			if(args.body && args.email) {
 				options.body = args.body;
-			if(args.link && args.email)
+			}
+			if(args.link && args.email) {
 				options.link = args.link;
+			}
 			console.log("setMessageFlag options=");
 			console.log(JSON.stringify(options));
 			client.set(args.flag, options, function(error, response, body) {
+				var data;
 				//console.log("error=" + error + " response=" + JSON.stringify(response) + " body=" + body);
 				if(error == "HTTP_ERROR") {
 					future.result = { returnValue: false, errormsg: "HTTP Error", errorcode: response.statusCode };
 					return;
 				}
-				var data = JSON.parse(body);
+				try {
+					data = JSON.parse(body);
+				} catch(err) {
+					data = {};
+				}
 				var errormsg = "";
 				if(error || !data.ok) {
 					console.log("Error: ", error);
@@ -1464,7 +1583,12 @@ var getBillingCredit = Class.create({
 			console.log("sending with client ", JSON.stringify(f.result.client));
 			var client = f.result.client;
 			client.connect('getBillingCredit', args.options, function(error, response, body) {
-				var data = JSON.parse(body);
+				var data;
+				try {
+					data = JSON.parse(body);
+				} catch(err) {
+					data = {};
+				}
 				var errormsg = "";
 				if(error || !data.ok) {
 					console.log("Error: ", error);
@@ -1511,4 +1635,4 @@ var setContactInfo = Class.create({
 		
 		return future;
 	}
-})
+});

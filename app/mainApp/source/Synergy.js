@@ -1,6 +1,9 @@
+// TODO: investigate voicemail breakage
+// TODO: watch our message database for deletions from the messaging app, and provide an option to delete or archive them from the server
+// RESEARCH: can same be done with blocking? how does the block option work in messaging? i think i doc'd that recently..
+// TODO: rewrite startup so we don't have to wait for messages to load before going to work
 // settings.settings.smsNotifications contains an array of { address: '+phone number', active: false } that describe the current sms forwarding status for each phone
 // TODO: Changing the sync time needs to re-set the alarm time immediately for all accounts
-// TODO: ***** DELETE PERMANENTLY CONFIRM DIALOG *****
 // TODO: load contacts into memory at app start, etc
 // TODO: add a button to Email Notifications menu that will open the Voice email configuration page
 // TODO: isSpam determines block status -- if they can be blocked (ie they aren't one of your forwarding numbers), they'll be marked Spam and blocked.
@@ -14,8 +17,6 @@
 
 // TODO: take the result from getSettings, and break it down to enyo.application.settings and enyo.application.phones, so we don't have enyo.application.settings.settings
 // TODO: do soemthing with settings.groups, settings.smsNotifications, settings.greetings ?
-
-var ServiceResponseLogging = false;
 
 enyo.kind({
 	name: "synergv.Toaster",
@@ -56,18 +57,17 @@ enyo.kind({
 		{ name: "MessageContent", allowHtml: true, onclick: "toggleToaster" },
 		{ name: "TipsContent", allowHtml: true, content:
 			"Tips: \
+			<p>To bring up options for a message, either tap the message text, or hold down briefly on it's location in the list on the left.<p>\
 			<p>SynerGV is Just Type-enabled - go to the webOS Settings tab, and select Just Type. \
 			Enable SynerGV Messages and Place call with SynerGV, to be able to search your messages \
 			and launch to the call view, right from Just Type!<p> \
 			Load up the Contacts app and make sure that all your Google Voice contacts are associated to the correct people -- sometimes \
 			Contact Merging isn't as bright as we'd like it to be.<p>\
 			Do some of your contacts have numbers instead of names?  Go to the Google Contacts site, and make sure that those contacts have actual names entered - Google Voice doesn't transmit names for contacts that only have Nicknames or Company Names.<p>\
-			Want your messages faster? Grab the (unofficial) webOS Boxcar app from the App Catalog, open up the App Menu here, and select 'Boxcar Notifications'. \
-			Nearly instantaneous push notifications from Boxcar.io! (this app is not yet available for public - this message will be removed if it's not available at release)<p>\
+			Want your messages faster? Try the 'Boxcar Notifications' option on the Menu. But please make sure you read the information on that page. :)<p>\
 			Want to send a message to one of your Google Voice contacts? You should be able to \
 			locate them in Just Type or the webOS Contacts app, then click on the 'IM' box next to their \
 			Google Voice contact number (not their main phone number)<p>\
-			To bring up options for a message, either tap the message text, or hold down briefly on it's location in the list on the left.<p>\
 			Want to call back a missed call directly from your webOS 2.2+ Pre3 or Veer? Just tap it on the TouchPad's button to place a call to the originator of whatever message is showing in SynerGV.<p>\
 			",
 			className: "chat-balloon-system", flex: 1 },
@@ -87,7 +87,7 @@ enyo.kind({
 								{ name: "StarButton", caption: "Star", onclick: "toggleStar" },
 								{ name: "SpamButton", caption: "Spam", onclick: "toggleSpam", },
 								{ name: "DeleteForeverButton", icon: "images/Xbutton.png", onclick: "deletePermanently", },
-								{ name: "DeleteButton", caption: "Delete", onclick: "toggleTrash" },
+								{ name: "DeleteButton", caption: "Trash", onclick: "toggleTrash" },
 								{ name: "NoteButton", onclick: "openNote", components:
 									[
 										{ name: "NoteIcon", kind: "enyo.Image", src: "images/note.png", style: "width: 22px; height: 22px; border: none; padding: 0; margin: 0;" },
@@ -109,7 +109,11 @@ enyo.kind({
 				{ kind: "Button", caption: "Add Contact", onclick: "addContact", className: "enyo-affirmative" },
 			]
 		},
+		{ name: "DeleteToaster", kind: "DialogPrompt", title: "Permanently Delete Messages", message: "You have selected to PERMANENTLY delete the marked conversations. Are you sure?", acceptButtonCaption: "Delete", cancelButtonCaption: "Cancel", onAccept: "actuallyDeletePermanently", onCancel: "closeDeleteToaster"},
 	],
+	closeDeleteToaster: function(inSender, inEvent) {
+		this.$.DeleteToaster.close();
+	},
 	openContactPopup: function(inSender, inEvent) {
 		this.$.ContactPopup.open();
 		this.$.ContactName.setValue(this.message.fromName);
@@ -155,12 +159,21 @@ enyo.kind({
 	},
 	deletePermanently: function(inSender, inEvent) { 
 		this.$.MenuToaster.close();
-		enyo.application.adjustAccessCount(1);
+		this.threadsToDelete = enyo.application.selectedIds.length ? enyo.application.selectedIds : [ this.message.id ];
+		this.log("querying to delete " + JSON.stringify(this.threadsToDelete));
+		this.$.DeleteToaster.open();
+		/*enyo.application.adjustAccessCount(1);
 		this.$.setMessageFlag.call({
 			accountId: enyo.application.accountId,
 			flag: "deleteForever",
 			id: enyo.application.selectedIds.length ? enyo.application.selectedIds : this.message.id
-		});
+		});*/
+	},
+	actuallyDeletePermanently: function() {
+		this.$.DeleteToaster.close();
+		this.log("actually deleting " + JSON.stringify(this.threadsToDelete));
+		enyo.application.adjustAccessCount(1);
+		this.$.setMessageFlag.call({ accountId: enyo.application.accountId, flag: "deleteForever", id: this.threadsToDelete });
 	},
 	toggleTrash: function(inSender, inEvent) {
 		this.$.MenuToaster.close();
@@ -217,9 +230,10 @@ enyo.kind({
 		this.log("inResponse=", inRequest.response);
 		if(inRequest.method == "setContactInfo") {
 			var data = inResponse.response.data;
-			if(data.matchingContacts && data.matchingContacts.length > 0 && data.matchContacts.name != inRequest.params.name)
+			if(data.matchingContacts && data.matchingContacts.length > 0 && (inRequest.params && inRequest.params.name.toLower() != data.matchingContacts[0].name.toLower()))
 			{
 				var params = inRequest.params;
+				this.log("original params=", params);
 				params.focusId = data.matchingContacts[0].focusId;
 				this.$.gvapi.call(params, { method: "setContactInfo" });			
 			}
@@ -371,7 +385,7 @@ enyo.kind({
 		this.$.ArchiveButton.setCaption(bArchived ? "UnArchive" : "Archive");
 		this.$.StarButton.setCaption(bStar ? "UnStar" : "Star");
 		this.$.SpamButton.setCaption(bSpam ? "UnSpam" : "Spam");
-		this.$.DeleteButton.setCaption(bTrash ? "UnDelete" : "Delete");
+		this.$.DeleteButton.setCaption(bTrash ? "UnTrash" : "Trash");
 		
 		this.$.DebugContent.setContent(JSON.stringify(this.message));
 		var header = "";
@@ -736,15 +750,17 @@ enyo.kind({
 						this.$.RightPane.selectViewByName("VoicemailView");
 						this.$.VoicemailPlayer.setMessageId(cmds[x].msgId);
 						this.$.VoicemailPlayer.playPauseClicked();
+						enyo.application.commands = [ ]; // ok, interactive commands halt any others when processed, i guess
 						break;
 					case "placecall":
 						this.$.RightPane.selectViewByName("TelephoneView");
 						this.$.TelephoneView.setPhoneNumber(cmds[x].msgId);
+						enyo.application.commands = [ ];
+						break;
 					default:
 						break;
 				}
 			}
-			enyo.application.commands = [ ];
 		}
 	},
 	apiFailure: function(inSender, inError, inRequest) {
@@ -924,6 +940,16 @@ enyo.kind({
 	name: "Synergy",
 	kind: enyo.VFlexBox,
 
+	accountReady: function() {
+		this.$.boxPicker.setDisabled(false);
+		// TODO: IntegerPicker has no setDisabled?!
+		//this.$.pagePicker.setDisabled(false);
+		this.$.RefreshButton.setDisabled(false);
+	},
+	phoneReady: function() {
+		this.$.PhoneButton.setDisabled(false);
+		this.$.VoicemailButton.setDisabled(false);
+	},
 	components: [
 		{kind: "ApplicationEvents", /*onApplicationRelaunch: "applicationRelaunchHandler",*/ onWindowParamsChange: "applicationRelaunchHandler" },
 		{ name: "PhoneHome", kind: "WebService", url: "http://www.ericbla.de/synergv/prerelease.php" },
@@ -933,15 +959,15 @@ enyo.kind({
 		{ name: "DeleteVoicemailDir", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "deleteVoicemailDir" },
 		{ name: "PageHeader", kind: "synergv.PageHeader", className: "page-header", components:
 			[
-				{ name: "boxPicker", kind: "synergv.ListSelector", value: "Inbox", onChange: "selectBox", className: "box-picker", items: ["Inbox", "Unread", "All", "Voicemail", "SMS", "Recorded", "Placed", "Received", "Missed", "Starred", "Spam", "Trash", "Search"] },
+				{ name: "boxPicker", disabled: true, kind: "synergv.ListSelector", value: "Inbox", onChange: "selectBox", className: "box-picker", items: ["Inbox", "Unread", "All", "Voicemail", "SMS", "Recorded", "Placed", "Received", "Missed", "Starred", "Spam", "Trash", "Search"] },
 				// TODO (later revision): make a ListSelector styled IntegerPicker
-				{ name: "pagePicker", label: "", /*label: "Page", */className: "page-picker", kind: "synergv.IntegerPicker", onChange: "selectPage", min: 1, max: 10 },
+				{ name: "pagePicker", disabled: true, label: "", /*label: "Page", */className: "page-picker", kind: "synergv.IntegerPicker", onChange: "selectPage", min: 1, max: 10 },
 				{ kind: "Spacer" },
 				{ name: "HeaderContent", content: "SynerGV" },
 				{ kind: "Spacer" },
-				{ name: "PhoneButton", kind: "ToolButton", className: "header-button", icon: "images/Blade_phone1.png", onclick: "callView" },
-				{ name: "VoicemailButton", kind: "ToolButton", className: "header-button", icon: "images/Blade_voice1.png", onclick: "callVoicemail" },
-				{ name: "RefreshButton", kind: "ToolButton", className: "header-button", icon: "images/refresh.png", onclick: "refreshView" },
+				{ name: "PhoneButton", disabled: true, kind: "ToolButton", className: "header-button", icon: "images/Blade_phone1.png", onclick: "callView" },
+				{ name: "VoicemailButton", disabled: true, kind: "ToolButton", className: "header-button", icon: "images/Blade_voice1.png", onclick: "callVoicemail" },
+				{ name: "RefreshButton", disabled: true, kind: "ToolButton", className: "header-button", icon: "images/refresh.png", onclick: "refreshView" },
 			]
 		},
 		{ kind: "AppMenu", lazy: false, components:
@@ -954,7 +980,8 @@ enyo.kind({
 				{ name: "DNDMenu", kind: "MenuCheckItem", caption: "Do Not Disturb", onclick: "toggleSetting", settingName: "doNotDisturb" },
 				{ name: "TranscriptsMenu", kind: "MenuCheckItem", caption: "Voicemail Transcripts", onclick: "toggleSetting", settingName: "showTranscripts" },
 				{ name: "MissedCallsInboxMenu", kind: "MenuCheckItem", caption: "Missed Calls To Inbox", onclick: "toggleSetting", settingName: "missedToInbox" },
-				{ name: "EditContactsMenu", caption: "Edit Google Contacts", onclick: "GoogleContacts" },
+				//{ name: "EditContactsMenu", caption: "Edit Google Contacts", onclick: "GoogleContacts" },
+				// TODO: the contact editor doesn't scroll right at all in webivew
 				{ name: "EditGroupsMenu", caption: "Edit Google Groups/Circles", onclick: "GoogleGroups" },
 				/*{ caption: "Email Notifications", defaultKind: "MenuCheckItem", components:
 					[
@@ -985,7 +1012,7 @@ enyo.kind({
 						{ content: "to return to SynerGV" },
 					]
 				},
-				{ content: "If the Purchase page does not open immediately, close this window and click the credit button again.", className: "enyo-item-ternary" },
+				//{ content: "If the Purchase page does not open immediately, close this window and click the credit button again.", className: "enyo-item-ternary" },
 				{ name: "Browser", style: "height: 580px; width: 100%;", kind: "WebView", url: "https://voice.google.com/" },
 			]
 		},		
@@ -1029,6 +1056,7 @@ enyo.kind({
 		//this.$.EmailNotificationsMenu.setChecked(set.emailNotificationActive);
 		//this.$.MissedCallsToEmailMenu.setChecked(set.missedToEmail);
 		//this.$.SMSToEmailMenu.setChecked(set.smsToEmailActive);
+		this.phoneReady();
 	},
 	toggleSetting: function(inSender, inEvent) {
 		var params = {};
@@ -1061,8 +1089,8 @@ enyo.kind({
 			}
 		});
 		var params = enyo.fetchDeviceInfo() || {};
-		params.release = "Hadak";
 		var appInfo = enyo.fetchAppInfo();
+		params.release = appInfo ? appInfo.release : "unknown";
 		params.v = appInfo ? appInfo.version : "chrome";
 		this.$.PhoneHome.call(params);
 	},
@@ -1154,6 +1182,8 @@ enyo.kind({
 		this.$.getAuthKey.call({ accountId: enyo.application.accountId });
 		this.selectMainView();
 		this.$.HeaderContent.setContent("SynerGV - " + account.username);
+		
+		this.accountReady();
 	},
 	authKeyReceived: function(inSender, inResponse, inRequest) {
 		enyo.application.adjustAccessCount(-1);

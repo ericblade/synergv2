@@ -57,6 +57,13 @@
             "props": [
                { "name": "conversations" }
             ]
+        },
+        {
+            "name": "deletedAndNotProcessed",
+            "incDel": true,
+            "props": [
+                {"name": "accountId"}, { "name": "delProcessed" }
+            ]
         }
     ]
 }

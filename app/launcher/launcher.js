@@ -57,7 +57,8 @@ enyo.kind({
 		this.log("boxcarLoginSuccess: ", inResponse);
 		//this.$.SubscribeService.call({ });
 		this.boxcarToken = inResponse.access_token;
-		this.connectBoxcar();
+		if(this.boxcarToken) // yay, webservice returns success with no results on a complete failure sometimes
+			this.connectBoxcar();
 	},
 	appUnloaded: function() {
 		this.log("SynerGV app shutting down...");
@@ -75,12 +76,13 @@ enyo.kind({
 	},
 	connectBoxcar: function() {
 		this.log();
-		if(!this.boxcarUsername || !this.boxcarPassword) {
+		if(!this.boxcarUsername || !this.boxcarPassword || !this.boxcarToken) {
 			this.log("no boxcar credentials supplied, bailing");
 			return;
 		}
 		this.boxcarSocket = /*new WebSocket("ws://127.0.0.1/websocket");*/ new WebSocket("ws://farm.boxcar.io:8080/websocket");
 		this.boxcarSocket.onopen = enyo.bind(this, function(inEvent) {
+			this.waitingOnSocket = false;
 			this.log("socket opened", inEvent);
 			this.boxcarSocket.send('{"access_token":"' + this.boxcarToken + '"}');
 		});

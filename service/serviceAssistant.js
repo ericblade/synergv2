@@ -4,17 +4,20 @@ serviceAssistant = Class.create({
         var prefsFuture = PalmCall.call("palm://com.palm.systemservice/", "getPreferences",
                                     {
                                         keys: [ "synergvSyncOutgoing", "synergvMarkReadOnSync",
-                                               "synergvSyncTime", "synergvSyncPlacedCalls" ]
+                                               "synergvSyncTime", "synergvSyncPlacedCalls",
+                                               "synergvSyncInbox", "synergvDeleteAction" ]
                                     });
                
         prefsFuture.then(prefsFuture.callback(this, function(f) {
             this.syncOutgoing = !!f.result.synergvSyncOutgoing;
             this.markReadOnSync = !!f.result.synergvMarkReadOnSync;
             this.syncPlacedCalls = !!f.result.synergvSyncPlacedCalls;
+            this.syncInbox = !!f.result.synergvSyncInbox;
+            this.deleteAction = f.result.synergvDeleteAction || "Archive";
             this.syncTime = parseInt(f.result.synergvSyncTime, 10) ? parseInt(f.result.synergvSyncTime, 10) : 5;
             this.syncTime = this.syncTime * 60;
             console.log("syncOutgoing=" + this.syncOutgoing + " markReadOnSync=" + this.markReadOnSync + " syncTime=" + this.syncTime);
-            console.log("syncPlacedCalls=" + this.syncPlacedCalls);
+            console.log("syncPlacedCalls=" + this.syncPlacedCalls + " synergvSyncInbox=" + this.syncInbox + " synergvDeleteAction=" + this.deleteAction);
             prefsFuture.result = { returnValue: true };
         }));
         return prefsFuture;
