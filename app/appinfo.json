@@ -5,7 +5,8 @@
 	"type": "web",
 	"main": "index.html",
 	"title": "SynerGV",
-	"icon": "icon.png",
+	"icon": "mainApp/images/synergv64.png",
+	"miniicon": "mainApp/images/google-voice-icon24.png",
 	"mimeTypes": [
 		{ "urlPattern": "^http://synergv/" }
     ],
@@ -35,7 +36,7 @@
 			}
 		},
 		"action": {
-			"displayName": "Place call with your Google Voice account",
+			"displayName": "Place call with SynerGV",
             "url": "com.ericblade.synergv",
             "launchParam": {
                 "cmd": "placecall", "msgId":"#{searchTerms}"
@@ -45,5 +46,5 @@
 	"noWindow": true,
 	"tapToShareSupported": true,
 	"uiRevision":2,
-	"release":"Hadak"
+	"release":"Eric"
 }

@@ -167,12 +167,12 @@ enyo.kind({
 											[
 												{ content: "Time delay between syncs" },
 												{ className: "enyo-item-ternary", allowHtml: true, content: "A longer delay will result in better battery performance at the expense of longer times between receiving messages" },
-												{ name: "SyncTimeSlider", kind: "Slider", maximum: 30, minimum: 1, position: 5, snap: true, onChange: "syncTimeChanged", onChanging: "syncTimeChanging" },
 												{ kind: "HFlexBox", pack: "center", components:
 													[
 														{ name: "SyncTimeCaption", className: "enyo-item-secondary", content: "5 minutes" },
 													]
 												},
+												{ name: "SyncTimeSlider", kind: "Slider", maximum: 30, minimum: 1, position: 5, snap: true, onChange: "syncTimeChanged", onChanging: "syncTimeChanging" },
 											]
 										},
 										{ kind: "Item", layoutKind: "VFlexLayout", components:

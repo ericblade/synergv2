@@ -133,12 +133,12 @@ enyo.kind({
 				}
 				this.boxcarDash = this.createComponent( {
 					kind: "Dashboard",
-					smallIcon: "images/google-voice-icon24.png",
-					icon: "images/google-voice-icon48.png",
+					smallIcon: "mainApp/images/google-voice-icon24.png",
+					icon: "mainApp/images/synergv48.png",
 					//onMessageTap: "dashboardTap",
 					//onIconTap: "dashboardTap",
 				});
-				var boxcarLayer = { icon: "mainApp/images/google-voice-icon48.png",
+				var boxcarLayer = { icon: "mainApp/images/synergv48.png",
 									smallIcon: "mainApp/images/google-voice-icon24.png",
 									title: "SynerGV Boxcar Notification", text: "Closing this will stop push notifications",
 									};

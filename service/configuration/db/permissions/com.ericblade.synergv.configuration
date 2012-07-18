@@ -1,0 +1,10 @@
+[
+    {
+        "type": "db.kind",
+        "object": "com.ericblade.synergv.configuration:1",
+        "caller": "com.ericblade.*",
+        "operations": {
+            "read": "allow"
+        }
+    }
+]

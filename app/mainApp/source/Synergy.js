@@ -1,3 +1,7 @@
+// TODO: investigate using a revSet on the _del property on messages to detect when they are deleted
+// 		 setup an activity to fire on internet available to archive/delete messages on server when they are deleted locally, rather
+//		 than doing it straight off.  where else could we make use of that technique? (do we need it to be persistent in case of a reboot before internet is back on?)
+// TODO: (9:13:34 PM) HaDAk`: if you use the checkboxes to select multiple messages, you should have the action bar pop up by default
 // TODO: investigate voicemail breakage
 // TODO: watch our message database for deletions from the messaging app, and provide an option to delete or archive them from the server
 // RESEARCH: can same be done with blocking? how does the block option work in messaging? i think i doc'd that recently..
@@ -78,25 +82,42 @@ enyo.kind({
 			[
 				{ kind: "Toolbar", defaultKind: "GroupedToolButton", components:
 					[
+						{ kind: "Spacer" },
 						{ kind: "ToolButtonGroup", components:
 							[
-								{ name: "AddContactButton", caption: "Add Contact", onclick: "openContactPopup" },
-								{ name: "MapButton", caption: "Map Location", onclick: "launchMap", },
 								{ name: "MarkReadButton", caption: "Mark Read", onclick: "toggleRead", },
 								{ name: "ArchiveButton", caption: "Archive", onclick: "toggleArchive" },
-								{ name: "StarButton", caption: "Star", onclick: "toggleStar" },
-								{ name: "SpamButton", caption: "Spam", onclick: "toggleSpam", },
-								{ name: "DeleteForeverButton", icon: "images/Xbutton.png", onclick: "deletePermanently", },
-								{ name: "DeleteButton", caption: "Trash", onclick: "toggleTrash" },
+								{ name: "SpamButton", caption: "Spam", onclick: "toggleSpam", },								
+							]
+						},
+						{ kind: "Spacer" },
+						{ kind: "ToolButtonGroup", components:
+							[
+								{ name: "AddContactButton", icon: "images/contactsaddnew.png", /*caption: "Add Contact",*/ onclick: "openContactPopup" },
+								{ name: "MapButton", icon: "images/map_jason_larose.png", /*caption: "Map Location",*/ onclick: "launchMap", },
+								{ name: "ComposeButton", icon: "images/Blade_msg1.png", onclick: "startCompose", },
+								{ name: "CallButton", icon: "images/Blade_phone1.png", onclick: "placeCall", },
+							]
+						},
+						{ kind: "Spacer" },
+						{ kind: "ToolButtonGroup", components:
+							[
+								{ name: "StarButton", icon: "images/star-button.png", /*caption: "Star",*/ onclick: "toggleStar" },
 								{ name: "NoteButton", onclick: "openNote", components:
 									[
 										{ name: "NoteIcon", kind: "enyo.Image", src: "images/note.png", style: "width: 22px; height: 22px; border: none; padding: 0; margin: 0;" },
 									]
 								}, 
-								{ name: "ComposeButton", icon: "images/Blade_msg1.png", onclick: "startCompose", },
-								{ name: "CallButton", icon: "images/Blade_phone1.png", onclick: "placeCall", },
 							]
 						},
+						{ kind: "Spacer" },
+						{ kind: "ToolButtonGroup", components:
+							[
+								{ name: "DeleteButton", icon: "images/trash-icon.png", /*caption: "Trash",*/ onclick: "toggleTrash" },
+								{ name: "DeleteForeverButton", icon: "images/Xbutton.png", onclick: "deletePermanently", },								
+							]
+						},
+						{ kind: "Spacer" },
 					]
 				}
 			]
@@ -109,7 +130,13 @@ enyo.kind({
 				{ kind: "Button", caption: "Add Contact", onclick: "addContact", className: "enyo-affirmative" },
 			]
 		},
-		{ name: "DeleteToaster", kind: "DialogPrompt", title: "Permanently Delete Messages", message: "You have selected to PERMANENTLY delete the marked conversations. Are you sure?", acceptButtonCaption: "Delete", cancelButtonCaption: "Cancel", onAccept: "actuallyDeletePermanently", onCancel: "closeDeleteToaster"},
+		{ name: "DeleteToaster", kind: "synergv.DeletePrompt", title: "Permanently Delete Messages",
+			message: "You have selected to PERMANENTLY delete the marked conversations. Are you sure? \
+			The Trashcan button will move your messages to the Trash folder, where they can be recovered \
+			for up to 30 days.",
+			acceptButtonCaption: "Delete", cancelButtonCaption: "Cancel", onAccept: "actuallyDeletePermanently",
+			onCancel: "closeDeleteToaster",
+		},
 	],
 	closeDeleteToaster: function(inSender, inEvent) {
 		this.$.DeleteToaster.close();
@@ -258,6 +285,8 @@ enyo.kind({
 		}
 		if(bDoRefresh || Array.isArray(inRequest.params.id)) {
 			this.doRefresh();
+		} else {
+			this.messageChanged(); // resetup the view and menu according to whatever new parameters are set/unset
 		}
 		if(msg)
 			enyo.windows.addBannerMessage(msg, '{}', "images/google-voice-icon24.png");
@@ -301,7 +330,8 @@ enyo.kind({
 	toggleToaster: function(inSender, inEvent) {
 		if(!this.$.MenuToaster.doNotOpen)
 		{
-			if(inEvent.clientY > window.innerHeight / 2)
+			this.$.MenuToaster.setDismissWithClick(enyo.application.selectedIds.length == 0);
+			if(enyo.application.selectedIds.length > 0 || inEvent.clientY > window.innerHeight / 2)
 			{
 				this.$.MenuToaster.setFlyInFrom("bottom");
 				this.$.MenuToaster.openNear({ top: window.innerHeight });
@@ -315,6 +345,9 @@ enyo.kind({
 		    //this.$.MenuToaster.open();
 		}
 		return true;
+	},
+	closeMenu: function() {
+		this.$.MenuToaster.close();
 	},
 	startCompose: function(inSender, inEvent) {
 		var recipients = [ ];
@@ -377,15 +410,17 @@ enyo.kind({
 		var bReceived = labels && labels.indexOf("received") !== -1;
 		var bRecorded = labels && labels.indexOf("recorded") !== -1;
 		
-		if(this.message && this.message.location != "")
-			this.$.MapButton.show();
+		if(this.message && this.message.location)
+			this.$.MapButton.setDisabled(false);
 		else
-			this.$.MapButton.hide();
+			this.$.MapButton.setDisabled(true);
 		this.$.MarkReadButton.setCaption(bRead ? "Mark Unread" : "Mark Read");
 		this.$.ArchiveButton.setCaption(bArchived ? "UnArchive" : "Archive");
-		this.$.StarButton.setCaption(bStar ? "UnStar" : "Star");
+		//this.$.StarButton.setCaption(bStar ? "UnStar" : "Star");
+		this.$.StarButton.setIcon(bStar ? "images/unstar-button.png" : "images/star-button.png");
 		this.$.SpamButton.setCaption(bSpam ? "UnSpam" : "Spam");
-		this.$.DeleteButton.setCaption(bTrash ? "UnTrash" : "Trash");
+		//this.$.DeleteButton.setCaption(bTrash ? "UnTrash" : "Trash");
+		this.$.DeleteButton.setIcon(bTrash ? "images/untrash-icon.png" : "images/trash-icon.png");
 		
 		this.$.DebugContent.setContent(JSON.stringify(this.message));
 		var header = "";
@@ -625,6 +660,11 @@ enyo.kind({
 			this.$.SelectCheckBox.setChecked(false);
 		}
 		this.log("selection: ", enyo.application.selectedIds);
+		if(enyo.application.selectedIds.length > 0) {
+			this.$.MessageView.toggleToaster(inSender, inEvent);
+		} else {
+			this.$.MessageView.closeMenu();
+		}
 		inEvent.stopPropagation();
 		return true;
 	},
@@ -1393,3 +1433,5 @@ enyo.kind({
 // make use of  @media only screen and (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) .. that's for iOS, find the parameters for Pre 3s.. ?
 
 // TODO: patch the "Block Sender" and "Delete Conversation" buttons in Messaging to send the commands to google too
+// TODO: rename toggleToaster to openMenu ?
+// TODO: need to use message type (10/11 for text conversations?) to determine if they are sms .. deleted items still show very little useful info

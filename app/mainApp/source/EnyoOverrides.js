@@ -1,4 +1,23 @@
 enyo.kind({
+	name: "synergv.DeletePrompt",
+	kind: "enyo.DialogPrompt",
+	components: [
+		{name: "client", className: "enyo-dialog-inner", components: [
+			{name: "title", className: "enyo-dialog-prompt-title"},
+			{className: "enyo-dialog-prompt-content", components: [
+				{name: "message", className: "enyo-dialog-prompt-message"},
+				{ kind: "HFlexBox", align: "center", pack: "center", components:
+					[
+						{name: "acceptButton", className: "enyo-button-negative", flex: 1, kind: "Button", onclick: "acceptClick"},
+						{name: "cancelButton", flex: 1, kind: "Button", onclick: "cancelClick"}						
+					]
+				}
+			]}
+		]}
+	],
+});
+
+enyo.kind({
 	name: "synergv.ListSelector",
 	kind: "ListSelector",
 	makePopup: function() {
