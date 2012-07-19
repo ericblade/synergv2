@@ -1,3 +1,5 @@
+// TODO: rewrite sync to bail if there's no internet
+// TODO: need to replace the timer for sync with a specificly timed Activity, and rewrite sync.complete to deal with resetting it up for a new specific time at the check interval
 // TODO: should we run sync before sending an IM?
 // TODO: we should probably only run one sync if there's a bunch of IMs sent in a short time period.. or do we already.. ?
 // TODO: it might be possible that just replacing the https event emitter with something that looks vaguely like it in
@@ -6,7 +8,6 @@
 // TODO: we can "syncAllAccounts" now, why don't we just set that up to run on the timer, instead of an individual sync per account?
 // TODO: how can we sync contacts added from the webOS app back to google?
 // TODO: If sync() returned it's messages, we could use sync() instead of getVoiceMessages() in the app, and then it would automatically sync the messaging app .. ?
-// TODO: should also validate all of those error handlers, setMessageFlag() seems to do it right, the others might not
 
 // Does deleting an account delete contacts??
 // TODO: need to make sure that we have our outgoing and incoming sync activities still in the
@@ -20,8 +21,6 @@
 // TODO: i'm seeing duplciate "auth details" logs, it should be caching those for later runs during the same service execution?
 // TODO: need to make sure we don't blow up on "missed call" and "placed call"
 // TODO: need to see what happens when we record a call 
-// TODO: need to add an interface somehow to args.markMessagesRead in sync, default it to true ..
-// TODO: need to add an interface somehow to args.storeOwn in storeConversation, default it to false?
 // TODO: look into Activities library at :
 //		/usr/palm/frameworks/foundations/submission/108/javascript/control#
 // TODO: can we monitor the immessage database on flags.read and see when the messaging app marks
@@ -34,8 +33,6 @@
 //		watches and alarms)
 // TODO: investigate what happens if we don't even put in the loginstate, or what happens if we
 //		watch on the loginstate and reset it to "online"/4 or "offline"/4
-// TODO: pretty-print phone numbers anywhere we put them into a database (i believe we do this in
-//		the gvoice app already)
 // TODO: explore seperating people's names into presumably first/middle/lasts before dropping them
 //		into the contacts database
 
@@ -161,56 +158,13 @@ var onCreate = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
 
-		// Setup permissions on the database objects so that our app can read/write them.
-		// This is purely optional, and according to the docs here:
-		// https://developer.palm.com/content/api/dev-guide/synergy/creating-synergy-contacts-package.html
-		// You shouldn't even need to do this. I wasn't able to immediately get the file method
-		//	to work though.
 		var accountstore = {
 			objects: [{
 				_kind: "com.ericblade.synergv.configuration:1",
 				accountId: args.accountId
 			}]
 		};
-		PalmCall.call("palm://com.palm.db/", "put", accountstore);
-		
-		var permissions = [
-			{
-				type: "db.kind",
-				object: "com.ericblade.synergv.immessage:1",
-				caller: "com.ericblade.*",
-				operations: {
-					read: "allow", 
-					create: "allow",
-					"delete": "allow",
-					update: "allow"
-				}
-			},
-			{
-				type: "db.kind",
-				object: "com.ericblade.synergv.immessage:1",
-				caller: "com.palm.*",
-				operations: {
-					read: "allow",
-					create: "allow",
-					"delete": "allow",
-					update: "allow"
-				}
-			},
-			{
-				type: "db.kind",
-				object: "com.ericblade.synergv.configuration:1",
-				caller: "com.ericblade.*",
-				operations: {
-					read: "allow", create: "allow", "delete": "allow", update: "allow"
-				}
-			}
-		];
-
-		PalmCall.call("palm://com.palm.db/", "putPermissions", { permissions: permissions } ).then(function(fut)
-		{
-			fut.result = { returnValue: true, permissionsresult:fut.result };
-		}).then(function(fut2) {
+		PalmCall.call("palm://com.palm.db/", "put", accountstore).then(function(fut2) {
 			var keystore1 = { "keyname":"GVUsername:"+args.accountId, "keydata": Base64.encode(args.config.username), "type": "AES", "nohide":true};
 			var keystore2 = { "keyname":"GVPassword:"+args.accountId, "keydata": Base64.encode(args.config.password), "type": "AES", "nohide":true};
 			var keystore3 = { "keyname":"GVAuth:"+args.accountId, "keydata": Base64.encode(args.config.auth), "type": "AES", "nohide":true };

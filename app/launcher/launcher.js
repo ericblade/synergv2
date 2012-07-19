@@ -57,8 +57,14 @@ enyo.kind({
 		this.log("boxcarLoginSuccess: ", inResponse);
 		//this.$.SubscribeService.call({ });
 		this.boxcarToken = inResponse.access_token;
-		if(this.boxcarToken) // yay, webservice returns success with no results on a complete failure sometimes
+		if(this.boxcarToken) {// yay, webservice returns success with no results on a complete failure sometimes
 			this.connectBoxcar();
+		} else {
+			// TODO: we should run Boxcar on a persistent activity, i guess. 
+			setTimeout(enyo.bind(this, function() {
+				this.$.BoxcarLogin.call({ username: this.boxcarUsername, password: this.boxcarPassword, api_key: "WJgcS7XCHZjoJiTZsgPo" });
+			}), 15000);
+		}
 	},
 	appUnloaded: function() {
 		this.log("SynerGV app shutting down...");
