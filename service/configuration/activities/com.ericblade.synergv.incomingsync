@@ -1,0 +1,25 @@
+{
+    "start": true,
+    "activity": {
+        "name": "SynerGVIncomingSync",
+        "description": "SynerGV incoming message sync",
+        "type": {
+            "background": true,
+            "power": true,
+            "powerDebounce": true,
+            "explicit": true,
+            "persist": true
+        },
+        "requirements": {
+            "internet": true
+        },
+        "schedule": {
+            "precise": true,
+            "interval": "1m"
+        },
+        "callback": {
+            "method": "palm://com.ericblade.synergv.service/syncAllAccounts",
+            "params": {}
+        }
+    }
+}

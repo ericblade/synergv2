@@ -1,7 +1,7 @@
 {
     "id": "com.ericblade.synergv.loginstate:1",
     "owner": "com.ericblade.synergv.service",
-    "sync": true,
+    "sync": false,
     "indexes": [
         {
             "name": "byAccountId",

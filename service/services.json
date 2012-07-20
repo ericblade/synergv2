@@ -21,7 +21,7 @@
 				{ "name": "onCredentialsChanged", "assistant": "onCredentialsChanged", "public": true },
 				{ "name": "loginStateChanged", "assistant": "loginStateChanged", "public": true },
 				{ "name": "sendIM", "assistant": "sendIM", "public": true },
-				{ "name": "sendCommands", "assistant": "sendCommand", "public": true },
+				{ "name": "sendCommand", "assistant": "sendCommand", "public": true },
 				{ "name": "startActivity", "assistant": "startActivity", "public": true },
 				{ "name": "adoptActivity", "assistant": "adoptActivity", "public": true },
 				{ "name": "completeActivity", "assistant": "completeActivity", "public": true },

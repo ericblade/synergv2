@@ -1,0 +1,34 @@
+{
+    "start": true,
+    "activity": {
+        "name": "SynerGV pending commands watch",
+        "description": "SynerGV pending commands watch",
+        "type": {
+            "background": true,
+            "power": true,
+            "powerDebounce": true,
+            "explicit": true,
+            "persist": true
+        },
+        "requirements": {
+            "internet": true
+        },
+        "trigger": {
+            "method": "palm://com.palm.db/watch",
+            "key": "fired",
+            "params": {
+                "subscribe": true,
+                "query": {
+                    "from": "com.ericblade.synergv.imcommand:1",
+                    "where": [
+                        { "op": "=", "prop": "status", "val": "pending" }
+                    ]
+                }
+            }
+        },
+        "callback": {
+            "method": "palm://com.ericblade.synergv.service/sendCommand",
+            "params": {}
+        }
+    }
+}

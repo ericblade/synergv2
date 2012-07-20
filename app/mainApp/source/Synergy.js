@@ -1,9 +1,10 @@
+// likely can't block people because we have isIMBuddy set. What did that do?
+
 // TODO: if app starts up with no internet connection, it just remains grey screened :(
 // TODO: attempt to merge gConversationId and timestamp for outgoing messages, when we sync in, then we can sync in the remaining ones?
 // TODO: investigate using a revSet on the _del property on messages to detect when they are deleted
 // 		 setup an activity to fire on internet available to archive/delete messages on server when they are deleted locally, rather
 //		 than doing it straight off.  where else could we make use of that technique? (do we need it to be persistent in case of a reboot before internet is back on?)
-// RESEARCH: how does the block function work in messaging?
 // TODO: rewrite startup so we don't have to wait for messages to load before going to work
 // settings.settings.smsNotifications contains an array of { address: '+phone number', active: false } that describe the current sms forwarding status for each phone
 // TODO: Changing the sync time needs to re-set the alarm time immediately for all accounts

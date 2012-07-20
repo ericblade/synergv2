@@ -1,12 +1,21 @@
 {
     "id": "com.ericblade.synergv.imcommand:1",
     "owner": "com.ericblade.synergv.service",
-    "sync": true,
+    "sync": false,
     "indexes": [
         {
-            "name": "accountId",
-            "props": [ { "name": "accountId" } ]
-        }    
+            "name": "outgoingCmd",
+            "props": [
+                { "name": "handler" },
+                { "name": "status", "default": "pending" }
+            ]
+        },
+        {
+            "name": "waitingCmd",
+            "props": [
+                { "name": "status", "default": "pending" }
+            ]
+        }
     ],
     "extends": [ "com.palm.imcommand:1" ]
 }

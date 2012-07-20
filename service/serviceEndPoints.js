@@ -1,5 +1,7 @@
+// TODO: does our command watch persist? it doesn't show in the "Service Persistent" list .. ??
 // TODO: rewrite sync to bail if there's no internet
 // TODO: need to replace the timer for sync with a specificly timed Activity, and rewrite sync.complete to deal with resetting it up for a new specific time at the check interval
+// TODO: can use schedule: { precise: true, interval: timer+"m" }, requirements: { internet: true }
 // TODO: should we run sync before sending an IM?
 // TODO: we should probably only run one sync if there's a bunch of IMs sent in a short time period.. or do we already.. ?
 // TODO: it might be possible that just replacing the https event emitter with something that looks vaguely like it in
@@ -342,14 +344,121 @@ var sendIM = Class.create({
 	}*/
 });
 
-var sendCommand = function(future) {};
+/* A block command looks like:
+ * [
+ * 	{
+ * 		"_id":"++I49u5_qNOsGm9W",
+ * 		"_kind":"com.ericblade.synergv.imcommand:1",
+ * 		"_rev":2064603,
+ * 		"_sync":true,
+ * 		"command":"blockBuddy",
+ * 		"fromUsername":"blade.eric",
+ * 		"handler":"transport",
+ * 		"params":{
+ * 			"block":true
+ * 		},
+ * 		"serviceName":"type_synergv",
+ * 		"targetUsername":"+12692908172"
+ * 	}
+ * ]
+ */
 
-// Included as part of the template.  You might want to fill this in with
-// any outgoing command code, to make it easy to call when needed.
-sendCommand.prototype.run = function(future) {
-	console.log("sendCommand");
-	future.result = { returnValue: true };
-};
+var sendCommand = Class.create({
+	run: function(future) {
+		var args = this.controller.args;
+		var assistant = this.controller.service.assistant;
+		var accountList = { };
+		console.log("sendCommand");
+		
+		future.nest(PalmCall.call("palm://com.ericblade.synergv.service/", "getAccounts", {}).then(function(f) {
+			var accounts = f.result.accounts;
+			for(var x = 0; x < accounts.length; x++) {
+				PalmCall.call("palm://com.palm.service.accounts/", "getAccountInfo", { accountId: accounts[x] }).then(function(fut) {
+					accountList[fut.result.result.username] = fut.result.result._id;
+					console.log("adding " + fut.result.result.username + " to list as " + fut.result.result._id);
+					if(x >= accounts.length) {
+						fut.result = { returnValue: true };
+						f.result = { returnValue: true };
+					}
+				});
+			}
+		}).then(function(f) {
+			console.log("sendCommand account list=", JSON.stringify(accountList));
+		}));
+		var query = {
+			from: "com.ericblade.synergv.imcommand:1",
+			where: [
+				{ "prop":"status", "op":"=", "val":"pending" }
+			]
+		};
+		future.nest(DB.find(query, false, false).then(function(f) {
+			var res = f.result.results;
+			var mergeIds = [];
+			for(var x = 0; x < res.length; x++) {
+				mergeIds.push({ _id: res[x]._id, status: "failed" });
+				switch(res[x].command) {
+					case "blockBuddy":
+						if(res[x].params.block)
+						{
+							// send block command for res[x].fromUsername on res[x].targetUsername
+						} else {
+							// send unblock command for res[x].fromUsername on res[x].targetUsername
+						}
+						break;
+					case "sendBuddyInvite":
+						// send buddy invite with message res[x].params.message for res[x].fromUsername to res[x].targetUsername
+						break;
+					case "deleteBuddy":
+						// remove buddy from buddy list for res[x].fromUsername to res[x].targetUsername
+						break;
+				}
+			}
+			DB.merge(mergeIds);
+			f.result = { returnValue: true };
+			future.result = { returnValue: true };
+		}));
+		
+		return future;
+	},
+	complete: function() {
+		var args = this.controller.args;
+		var activity = args.$activity;
+		console.log("sendCommand complete starting", JSON.stringify(args));
+		//console.log("activity received was", JSON.stringify(activity));
+		var newact = {
+			//activityName: "SynerGVOutgoingSync",
+			//activityId: activity.activityId,
+			restart: true,
+			// the docs say you shouldn't need to specify the trigger and callback conditions again, i think..
+			// someone else said reset the callback to a different function .. to avoid the "Temporarily Not Available" problem
+			// other people say you do. so let's try it.
+			trigger: {
+				key: "fired",
+				method: "palm://com.palm.db/watch",
+				params: {
+					query: {
+						from: "com.ericblade.synergv.imcommand:1",
+						where:
+						[
+							{ "op": "=", "prop": "status", "val": "pending" }
+						],
+						limit: 1
+					},
+					subscribe: true
+				}
+			}
+		};
+		if(activity && activity.activityId) {
+			newact.activityId = activity.activityId;
+		} else {
+			newact.activityName = "SynerGV pending commands watch";
+		}
+		PalmCall.call("palm://com.palm.activitymanager/", "complete",  newact).then(function(f) {
+			//console.log("sync complete completed", JSON.stringify(f.result));
+			f.result = { returnValue: true };
+		});
+	}
+});
 
 var onEnabled = Class.create({
 	run: function(future) {
@@ -424,9 +533,80 @@ var startActivity = Class.create({
 	run: function(activityFuture)
 	{
 		var args = this.controller.args;
+		
+		PalmCall.call("palm://com.palm.activitymanager/", "create",
+			{
+				"start": true,
+				"replace": true,
+				"activity": {
+					"name": "SynerGV pending commands watch",
+					"description": "SynerGV pending commands watch",
+					"type": {
+						"background": true,
+						"power": true,
+						"powerDebounce": true,
+						"explicit": true,
+						"persist": true
+					},
+					"requirements": {
+						"internet": true
+					},
+					"trigger": {
+						"method": "palm://com.palm.db/watch",
+						"key": "fired",
+						"params": {
+							"subscribe": true,
+							"query": {
+								"from": "com.ericblade.synergv.imcommand:1",
+								"where": [
+									{ "op": "=", "prop": "status", "val": "pending" }
+								]
+							}
+						}
+					},
+					"callback": {
+						"method": "palm://com.ericblade.synergv.service/sendCommand",
+						"params": {}
+					}
+				}
+			}
+		);
+		PalmCall.call("palm://com.palm.activitymanager/", "create",
+			{
+				"start": true,
+				"replace": true,
+				"activity": {
+					"name": "SynerGVIncomingSync",
+					"description": "SynerGV incoming message sync",
+					"type": {
+						"background": true,
+						"power": true,
+						"powerDebounce": true,
+						"explicit": true,
+						"persist": true
+					},
+					"requirements": {
+						"internet": true
+					},
+					"schedule": {
+						"precise": true,
+						"interval": "1m"
+					},
+					"callback": {
+						"method": "palm://com.ericblade.synergv.service/syncAllAccounts",
+						"params": {}
+					}
+				}
+			}					  
+		);
+		if(!args.accountId) {
+			activityFuture.result = { returnValue: false, errormsg: "No Account Id given!" };
+			return activityFuture;
+		}
 		var x = PalmCall.call("palm://com.palm.activitymanager/", "create",
 			{
 				start: true,
+				replace: true,
 				activity: {
 					name: "SynerGVOutgoingSync:" + args.accountId,
 					description: "SynerGV Pending Messages Watch",
@@ -697,21 +877,6 @@ var sync = Class.create({
 			}
 			args.accountId = actname.substr(x+1);
 		}
-		/*if(args.accountId === undefined)
-		{
-			var name = args.$activity.name;
-			var x = name.indexOf(":")+1;
-			if(x == -1) {
-				syncFuture.result = { returnValue: false };
-				return;
-			}
-			args.accountId = name.substr(x);
-		}
-		if(args.accountId === undefined || assistant.GVclient == undefined)
-		{
-		    syncFuture.result = { returnValue: false };
-			return;
-		}*/
 		var query = {
 						from: "com.ericblade.synergv.immessage:1",
 						orderBy: "_rev",
@@ -723,23 +888,11 @@ var sync = Class.create({
 						]
 					};
 				// TODO: we really really need to store lastRev in the database somewhere and pull it up on initialization
-				// TODO: of course, we also need to attempt to get our GV client up at initialization as well
 		if(assistant.lastRev !== undefined && assistant.lastRev !== "undefined")
 		{
 			query.where.push({ "prop": "_rev", "op":">", "val": this.controller.service.assistant.lastRev });
 		}
 		
-		console.log("setting alarm");
-		syncFuture.nest(PalmCall.call("palm://com.palm.power/timeout/", "set", {
-			key: "SynerGVsync:" + args.accountId,
-			//"in": "00:05:00",
-			//"in": "00:02:30",
-			"in": !isNaN(assistant.syncTime) ? secondsToTime(assistant.syncTime) : "00:02:00",
-			uri: "palm://com.ericblade.synergv.service/sync",
-			params: { accountId: args.accountId }
-		}).then(function(f) {
-			console.log("alarm set result (" + !isNaN(assistant.syncTime) ? secondsToTime(assistant.syncTime) : "00:02:00" + "):", JSON.stringify(f.result));
-		}));
 		var dbResults;
 		syncFuture.nest(DB.find(query, false, false).then(function(f) {
 			dbResults = f.result.results;
@@ -840,8 +993,6 @@ var sync = Class.create({
 				}
 			});			
 		}).then(function(f) {
-			//console.log("All messages:", JSON.stringify(tempMsgs));
-			// TODO: check if there actually are any messages to mark before sending the mark read
 			console.log("****** END OF SYNCFUTURE!!!!!!! Marking read:", JSON.stringify(conversationIds));
 			if(args.markMessagesRead && conversationIds.length > 0) {
 				PalmCall.call("palm://com.ericblade.synergv.service/", "setMessageFlag", { accountId: args.accountId, flag: "read", id: conversationIds });				
@@ -851,46 +1002,82 @@ var sync = Class.create({
 	},
 	complete: function() {
 		var args = this.controller.args;
+		var assistant = this.controller.service.assistant;
 		var activity = args.$activity;
+		var newact = { };
 		//console.log("sync complete starting", JSON.stringify(args));
-		//console.log("activity received was", JSON.stringify(activity));
-		if(args.accountId === undefined) {
-			return;
-		}
-		if(activity === undefined) {
-			return;
-		}
-		var newact = {
-			//activityName: "SynerGVOutgoingSync",
-			activityId: activity.activityId,
-			restart: true,
-			// the docs say you shouldn't need to specify the trigger and callback conditions again, i think..
-			// someone else said reset the callback to a different function .. to avoid the "Temporarily Not Available" problem
-			// other people say you do. so let's try it.
-			trigger: {
-				key: "fired",
-				method: "palm://com.palm.db/watch",
-				params: {
-					query: {
-						from: "com.ericblade.synergv.immessage:1",
-						where:
-						[
-							{ "prop":"folder", "op":"=", "val":"outbox" },
-							{ "prop":"status", "op":"=", "val":"pending" }
-						],
-						limit: 1
-					},
-					subscribe: true
+		console.log("activity received was", JSON.stringify(activity));
+		if(activity && activity.name.indexOf("SynerGVOutgoingSync") == 0) {
+			if(args.accountId === undefined) {
+				return;
+			}
+			if(activity === undefined) {
+				return;
+			}
+			newact = {
+				activityId: activity.activityId,
+				restart: true,
+				// the docs say you shouldn't have to specify the trigger again .. but you do, apparently
+				trigger: {
+					key: "fired",
+					method: "palm://com.palm.db/watch",
+					params: {
+						query: {
+							from: "com.ericblade.synergv.immessage:1",
+							where:
+							[
+								{ "prop":"folder", "op":"=", "val":"outbox" },
+								{ "prop":"status", "op":"=", "val":"pending" }
+							],
+							limit: 1
+						},
+						subscribe: true
+					}
+				}
+			};
+			if(this.controller.service.assistant && this.controller.service.assistant.lastRev)
+			{
+				newact.trigger.params.query.where.push({ "prop": "_rev", "op":">", "val": this.controller.service.assistant.lastRev });
+			}
+			PalmCall.call("palm://com.palm.activitymanager/", "complete",  newact).then(function(f) {
+				f.result = { returnValue: true };
+			});
+		} 
+		newact = 
+		{
+			"start": true,
+			"replace": true,
+			"activity": {
+				"name": "SynerGVIncomingSync",
+				"description": "SynerGV incoming message sync",
+				"type": {
+					"background": true,
+					"power": true,
+					"powerDebounce": true,
+					"explicit": true,
+					"persist": true
+				},
+				"requirements": {
+					"internet": true
+				},
+				"schedule": {
+					"precise": true,
+					"interval": parseInt(assistant.syncTime / 60, 10) + "m"
+				},
+				"callback": {
+					"method": "palm://com.ericblade.synergv.service/syncAllAccounts",
+					"params": {}
 				}
 			}
 		};
-		if(this.controller.service.assistant && this.controller.service.assistant.lastRev)
-		{
-			newact.trigger.params.query.where.push({ "prop": "_rev", "op":">", "val": this.controller.service.assistant.lastRev });
-		}
-		PalmCall.call("palm://com.palm.activitymanager/", "complete",  newact).then(function(f) {
-			//console.log("sync complete completed", JSON.stringify(f.result));
+		// for some reason, the activity no longer exists by the time we get here, so instead of
+		// completing it, we re-create it. i guess.
+		PalmCall.call("palm://com.palm.activitymanager/", "create", newact).then(function(f) {
+			console.log("sync interval complete completed, restarting sync interval at " + newact.activity.schedule.interval);
 			f.result = { returnValue: true };
+		}, function(f) {
+			console.log("Oh shit, something bad happened, our sync activity is probably dead.");
+			// TODO: trigger the app to display an error to the user ?
 		});
 	}	
 });
@@ -953,43 +1140,6 @@ var syncDeleted = Class.create({
 	}
 });
 
-/*var storeMsg = Class.create({
-	run: function(future)
-	{
-		var args = this.controller.args;
-		console.log("attempting to store/reject message");
-		var query = {
-			from: "com.ericblade.synergv.immessage:1",
-			where: [
-				{ prop: "gConversationId", op: "=", val: args.id },
-				{ prop: "messageText", op:"=", val: args.text }
-			]
-		};
-					var dbq = [{
-							_kind: "com.ericblade.synergv.immessage:1",
-							accountId: args.accountId,
-							localTimestamp: parseInt(args.time),
-							timestamp: parseInt(args.time),//Math.round(this.MessageIndex[index].startTime / 100),
-							folder: args.from == "Me:" ? "outbox" : "inbox",
-							status: "successful",
-							//flags: { read: this.MessageIndex[index].isRead, visible: true },
-							messageText: args.text,
-							from: { addr: args.from == "Me:" ? "blade.eric" : args.displayNumber },
-							to: [{ addr: args.from == "Me:" ? args.displayNumber : "blade.eric" }],
-							serviceName: "type_synergv",
-							// TODO: MAKE THIS RIGHT
-							username: "blade.eric",
-							gConversationId: args.id
-						}];
-
-					console.log("putting messages? put=", JSON.stringify(dbq));
-					DB.put(dbq).then(function(putFuture) {
-						console.log("putFuture result", JSON.stringify(putFuture.result));
-						future.result = { returnValue: true };
-					});
-	}
-});*/
-
 var syncAllAccounts = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
@@ -1023,7 +1173,7 @@ var syncContacts = Class.create({
 			if(x == -1) return undefined;
 			args.accountId = name.substr(x);*/
 		}
-		if(!assistant.GVclient)
+		/*if(!assistant.GVclient)
 		{
 			console.log("sync was not able to locate a GVclient");
 			future.nest(PalmCall.call("palm://com.palm.keymanager/", "fetchKey", { "keyname": "GVAuth:" + args.accountId }).then(function(f) {
@@ -1046,7 +1196,7 @@ var syncContacts = Class.create({
 		} else {
 			future.result = { returnValue: true };
 		}
-		return future;
+		return future;*/
 	},
 	run: function(future) {
 		var assistant = this.controller.service.assistant;
