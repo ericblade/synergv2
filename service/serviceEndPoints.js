@@ -66,7 +66,10 @@ var getVoiceMessages = Class.create({
 		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
 			var GVclient = f.result.client;
 			var start = ( ((args.page || 1) - 1) * 10) + 1;
-			GVclient.get(args.inbox || 'inbox', { start: start, limit: 10 }, function(error, response) {
+			var params = { start: start, limit: 10 };
+			if(args.inbox == "search")
+			    params.query = args.query;
+			GVclient.get(args.inbox || 'inbox', params, function(error, response) {
 				if(error) {
 					future.result = { returnValue: false, error: error };
 				}
@@ -475,15 +478,16 @@ var onEnabled = Class.create({
 				future.nest(PalmCall.call("palm://com.palm.activitymanager/", "stop", { activityName: "SynerGVOutgoingSync:" + args.accountId }).then(function(f) {
 					console.log("outgoing sync stop result=", JSON.stringify(f.result));
 				}));
-				future.nest(PalmCall.call("palm://com.palm.power/timeout/", "clear", { key: "SynerGVsync:" + args.accountId }).then(function(f) {
+				/*future.nest(PalmCall.call("palm://com.palm.power/timeout/", "clear", { key: "SynerGVsync:" + args.accountId }).then(function(f) {
 					console.log("incoming sync stop result=", JSON.stringify(f.result));
-				}));
+				}));*/
 				future.nest(DB.del({ from: "com.ericblade.synergv.contact:1", where: [ { prop: "accountId", op: "=", val: args.accountId } ] }).then(function(f) {
 					console.log("contact removal result=", JSON.stringify(f.result));
 				}));
-				future.nest(DB.del({ from: "com.ericblade.synergv.imcommand:1", where: [ { prop: "accountId", op: "=", val: args.accountId } ] }).then(function(f) {
+				// TODO: we need to delete these by username not by accountId
+				/*future.nest(DB.del({ from: "com.ericblade.synergv.imcommand:1", where: [ { prop: "accountId", op: "=", val: args.accountId } ] }).then(function(f) {
 					console.log("imcommand removal result=", JSON.stringify(f.result));
-				}));
+				}));*/
 				future.nest(DB.del({ from: "com.ericblade.synergv.immessage:1", where: [ { prop: "accountId", op: "=", val: args.accountId } ] }).then(function(f) {
 					console.log("immessage removal result=", JSON.stringify(f.result));
 				}));
@@ -1167,7 +1171,7 @@ var syncContacts = Class.create({
 		console.log("*** syncContacts setup");
 		if(args.accountId === undefined)
 		{
-			args.accountId = "++I3QFFczN_8Mbxe";
+			args.accountId = "++I4A4r8QkOFL_Na";
 			/*var name = args.$activity.name;
 			var x = name.indexOf(":")+1;
 			if(x == -1) return undefined;

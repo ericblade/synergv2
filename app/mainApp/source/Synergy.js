@@ -1,3 +1,6 @@
+// TODO: Search full Just Type doesn't launch if app already open. try other commands as well!
+// TODO: Search should launch straight to the search page instead of loading Inbox first
+
 // likely can't block people because we have isIMBuddy set. What did that do?
 
 // TODO: if app starts up with no internet connection, it just remains grey screened :(
@@ -535,6 +538,7 @@ enyo.kind({
 	events: {
 		"onSettingsReceived": "",
 		"onSetPages": "",
+		"onSetBox": "",
 	},
 	components: [
 		{ name: "gvapi", kind: "PalmService", service: "palm://com.ericblade.synergv.service", onSuccess: "apiSuccess", onFailure: "apiFailure", components:
@@ -548,6 +552,7 @@ enyo.kind({
 			[
 				{ name: "LeftView", width: "320px", kind: "SlidingView", components:
 					[
+						{ name: "SearchInput", kind: "enyo.SearchInput", onkeypress: "searchKeypress", onclick: "searchClick" },
 						{ kind: "Scroller", flex: 1, components:
 							[
 								{ name: "NoMessagesMessage", showing: false, components:
@@ -623,6 +628,27 @@ enyo.kind({
 			]
 		}
 	],
+	doSearch: function(str) {
+		enyo.application.adjustAccessCount(1);		
+		this.$.getVoiceMessages.call(
+			{
+				accountId: enyo.application.accountId,
+				inbox: "search",
+				query: str,
+				page: enyo.application.inboxPage ? enyo.application.inboxPage : 1,
+			});		
+	},
+	searchKeypress: function(inSender, inEvent) {
+		if(inEvent && inEvent.keyCode == 13) {
+			this.doSearch(this.$.SearchInput.getValue());
+			return true;
+		}
+		return false;
+	},
+	searchClick: function(inSender, inEvent) {
+		this.log();
+		this.doSetBox("Search");
+	},
 	tapToShare: function() {
 		this.$.RightPane.getView().tapToShare();
 	},
@@ -795,6 +821,12 @@ enyo.kind({
 					case "placecall":
 						this.$.RightPane.selectViewByName("TelephoneView");
 						this.$.TelephoneView.setPhoneNumber(cmds[x].msgId);
+						enyo.application.commands = [ ];
+						break;
+					case "search":
+						this.doSetBox("Search");
+						this.$.SearchInput.setValue(cmds[x].msgId);
+						this.doSearch(cmds[x].msgId);
 						enyo.application.commands = [ ];
 						break;
 					default:
@@ -1039,7 +1071,7 @@ enyo.kind({
 			[
 				{ name: "AccountsView", kind: "AccountsView",
 					onSelectedAccount: "accountSelected" },
-				{ name: "MainView", kind: "MainView", onSettingsReceived: "settingsReceived", onSetPages: "setPages" },
+				{ name: "MainView", kind: "MainView", onSettingsReceived: "settingsReceived", onSetPages: "setPages", onSetBox: "setBox" },
 				{ name: "BoxCarView", kind: "BoxCarView", onBack: "goBack", className: "box-center", },
 			]
 		},
@@ -1057,6 +1089,10 @@ enyo.kind({
 			]
 		},		
 	],
+	setBox: function(inSender, str) {
+		this.log();
+		this.$.boxPicker.setValue(str);
+	},
 	GoogleGroups: function() {
 		this.openBrowser();
 		this.$.Browser.setUrl("https://www.google.com/voice#groups");
@@ -1180,7 +1216,7 @@ enyo.kind({
 			msgId = params.msgId;
 		if(cmd !== "") {
 			enyo.application.commands.push({ cmd: cmd, accountId: accountId, msgId: msgId });
-			if(accountId !== undefined && enyo.application.accountId == accountId)
+			if(accountId !== undefined && (enyo.application.accountId == accountId || accountId == "unknown") )
 				this.$.MainView.processCommands();
 		}
 		if(accountId !== "") {

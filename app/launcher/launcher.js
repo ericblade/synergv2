@@ -39,6 +39,8 @@ enyo.kind({
                 break;
             case "noWindow":
                 return true;
+			case "search":
+				return false; // pass this thru to the app
             default: // let the app deal with anything else
                 return false;
         }
