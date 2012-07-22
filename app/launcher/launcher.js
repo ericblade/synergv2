@@ -25,7 +25,7 @@ enyo.kind({
 		this.log(inPrefs);
 		if(inPrefs.synergvBoxcarUsername !== undefined) this.boxcarUsername = inPrefs.synergvBoxcarUsername;
 		if(inPrefs.synergvBoxcarPassword !== undefined) this.boxcarPassword = inPrefs.synergvBoxcarPassword;
-		if(!this.boxcarUsername && !this.boxcarPassword && this.boxcarSocket)
+		if( (!this.boxcarUsername || !this.boxcarPassword) && this.boxcarSocket)
 		{
 			this.boxcarSocket.close();
 		} else if(this.boxcarUsername && this.boxcarPassword) {
@@ -60,9 +60,10 @@ enyo.kind({
 		//this.$.SubscribeService.call({ });
 		this.boxcarToken = inResponse.access_token;
 		if(this.boxcarToken) {// yay, webservice returns success with no results on a complete failure sometimes
-			this.connectBoxcar();
+			setTimeout(enyo.bind(this, this.connectBoxcar), 1000);
+			//this.connectBoxcar();
 		} else {
-			// TODO: we should run Boxcar on a persistent activity, i guess. 
+			// TODO: we should run Boxcar on a persistent activity, i guess.
 			setTimeout(enyo.bind(this, function() {
 				this.$.BoxcarLogin.call({ username: this.boxcarUsername, password: this.boxcarPassword, api_key: "WJgcS7XCHZjoJiTZsgPo" });
 			}), 15000);
@@ -88,80 +89,47 @@ enyo.kind({
 			this.log("no boxcar credentials supplied, bailing");
 			return;
 		}
+		this.log("******************** connecting to socket ********************* ");
 		this.boxcarSocket = /*new WebSocket("ws://127.0.0.1/websocket");*/ new WebSocket("ws://farm.boxcar.io:8080/websocket");
-		this.boxcarSocket.onopen = enyo.bind(this, function(inEvent) {
-			this.waitingOnSocket = false;
-			this.log("socket opened", inEvent);
-			this.boxcarSocket.send('{"access_token":"' + this.boxcarToken + '"}');
-		});
-		this.boxcarSocket.onerror = enyo.bind(this, function(inEvent) {
-			this.log("socket error", inEvent);
-			if(this.boxcarDash) {
-				this.boxcarDash.destroy();
-				this.boxcarDash = undefined;
-			}
-		});
-		this.boxcarSocket.onclose = enyo.bind(this, function(inEvent) {
-			this.log("socket closed", inEvent);
-			if(this.boxcarDash) {
-				this.boxcarDash.destroy();
-				this.boxcarDash = undefined;
-			}
-			if(this.Online && !this.shuttingDown && this.boxcarUsername && this.boxcarPassword) {
-				this.$.BoxcarLogin.call({
-					username: this.boxcarUsername,
-					password: this.boxcarPassword,
-					api_key: "WJgcS7XCHZjoJiTZsgPo"
-				});
-			}
-		});
-		this.boxcarSocket.onmessage = enyo.bind(this, function(inEvent) {
-// {"code":200,"message":"success","badge_count":48}
-//
-//  {"all_unread_count":45,
-//	"icon":"http://s3.amazonaws.com/boxcar-production1/providers/icons/316/google_voice_512_normal_48.png",
-//	"sound":"Default",
-//	"from_screen_name":"Laura (SMS)",
-//	"message":"message text line 1  \r\nmessage text line 2  \r\nmessage text line 3",
-//	"service_unread_count":45,
-//	"created_at":"2012-07-12 22:15:47 UTC",
-//	"service_id":1992242,
-//	"source_url":null,
-//	"service_name":"Google Voice",
-//	"provider_id":316,
-//	"provider_name":"Google Voice",
-//	"push_hash":"01a3c7d9f57918a2cd3527e4503fbf6593fe6c9a"}
-			this.log("socket received message", inEvent);
-// message data= {"code":500,"error":"Could not authenticate user"}
-			var data = JSON.parse(inEvent.data);
-			this.log("message data=", data);
-			if(data.code == 200) { // login ok
-				if(this.boxcarDash) {
-					this.boxcarDash.destroy();
-				}
-				this.boxcarDash = this.createComponent( {
-					kind: "Dashboard",
-					smallIcon: "mainApp/images/google-voice-icon24.png",
-					icon: "mainApp/images/synergv48.png",
-					//onMessageTap: "dashboardTap",
-					//onIconTap: "dashboardTap",
-				});
-				var boxcarLayer = { icon: "mainApp/images/synergv48.png",
-									smallIcon: "mainApp/images/google-voice-icon24.png",
-									title: "SynerGV Boxcar Notification", text: "Closing this will stop push notifications",
-									};
-				this.boxcarDash.push(boxcarLayer);
 
-			}
-			if(data.code == 500) { // no authorization
+		if(this.socketTimer)
+		{
+			clearTimeout(this.socketTimer);
+		}
+		if(this.socketInterval)
+		{
+			clearInterval(this.socketInterval);
+		}
 
-				this.boxcarSocket.close();
-			}
-			if(data.provider_id == 316) { // Google Voice
-				this.log("Syncing SynerGV from Boxcar event!");
-				this.$.SyncAllAccounts.call({ }, { subscribe: true });
-			}
-		});
+		if(!this.boxcarConnectingDash) {
+			this.boxcarConnectingDash = this.createComponent( {
+				kind: "Dashboard",
+				smallIcon: "mainApp/images/google-voice-icon24.png",
+				icon: "mainApp/images/synergv48.png",
+				//onMessageTap: "dashboardTap",
+				//onIconTap: "dashboardTap",
+			});
+			var boxcarConnectingLayer = { icon: "mainApp/images/synergv48.png",
+								smallIcon: "mainApp/images/google-voice-icon24.png",
+								title: "Connecting to Boxcar", text: "Closing before connection may cause a webOS restart.",
+								};
+			this.boxcarConnectingDash.push(boxcarConnectingLayer);
+		}
+
+		this.socketTimer = setTimeout(enyo.bind(this, function() {
+			this.log("Retrying Boxcar...");
+			setTimeout(enyo.bind(this, this.connectBoxcar), 2000);
+			//this.connectBoxcar();
+		}), 30000);
+			this.socketInterval = setInterval(enyo.bind(this, function() {
+				this.log("boxcarSocket state=", this.boxcarSocket.readyState);
+			}), 5000);
+
+		this.boxcarSocket.onopen = enyo.bind(this, this.socketOpen);
+		this.boxcarSocket.onerror = enyo.bind(this, this.socketError);
+		this.boxcarSocket.onclose = enyo.bind(this, this.socketClose);
+		this.boxcarSocket.onmessage = enyo.bind(this, this.socketMessage);
+
 	},
 	boxcarLoginFailure: function(inSender, inError, inRequest) {
 		this.log("boxcarLoginFailure: ", inError);
@@ -200,5 +168,86 @@ enyo.kind({
             }
         }
     },
+	socketOpen: function(inEvent) {
+		this.log("socket opened ", inEvent);
+		this.boxcarSocket.send('{"access_token":"' + this.boxcarToken + '"}');
 
+		var oldDash = this.boxcarDash;
+		this.boxcarDash = this.createComponent({
+			kind: "Dashboard",
+			smallIcon: "mainApp/images/google-voice-icon24.png",
+			icon: "mainApp/images/synergv48.png",
+		});
+		var boxcarLayer = {
+			icon: "mainApp/images/synergv48.png",
+			smallIcon: "mainApp/images/google-voice-icon24.png",
+			title: "SynerGV Boxcar.io Notification",
+			text: "Closing will stop push notifications"
+		};
+		this.boxcarDash.push(boxcarLayer);
+		if(oldDash)
+			oldDash.destroy();
+		if(this.boxcarConnectingDash)
+		    this.boxcarConnectingDash.destroy();
+
+		if(this.socketTimer) {
+			clearTimeout(this.socketTimer);
+		}
+	},
+	socketError: function(inEvent) {
+		this.log("socket error ", inEvent);
+		if(this.boxcarDash)
+		    this.boxcarDash.destroy();
+		if(this.boxcarConnectingDash)
+		    this.boxcarConnectingDash.destroy();
+		this.boxcarDash = this.boxcarConnectingDash = undefined;
+	},
+	socketClose: function(inEvent) {
+		this.log("socket closed ", inEvent);
+		/*if(this.boxcarDash) {
+			this.boxcarDash.destroy();
+			this.boxcarDash = undefined;
+		}*/
+		if(this.Online && !this.shuttingDown && this.boxcarUsername && this.boxcarPassword) {
+			// attempt reconnect, in case we just lost connection, it should tell us if our
+			// token has expired there. If it has, then that function should throw a message,
+			// which we'll respond to by getting a new Token.
+			setTimeout(enyo.bind(this, this.connectBoxcar), 2000);
+			//this.connectBoxcar();
+		}
+	},
+// {"code":200,"message":"success","badge_count":48}
+//
+//  {"all_unread_count":45,
+//	"icon":"http://s3.amazonaws.com/boxcar-production1/providers/icons/316/google_voice_512_normal_48.png",
+//	"sound":"Default",
+//	"from_screen_name":"Laura (SMS)",
+//	"message":"Redacted",
+//	"service_unread_count":45,
+//	"created_at":"2012-07-12 22:15:47 UTC",
+//	"service_id":1992242,
+//	"source_url":null,
+//	"service_name":"Google Voice",
+//	"provider_id":316,
+//	"provider_name":"Google Voice",
+//	"push_hash":"01a3c7d9f57918a2cd3527e4503fbf6593fe6c9a"}
+// message data= {"code":500,"error":"Could not authenticate user"}
+
+	socketMessage: function(inEvent) {
+		this.log("socket received message ", inEvent);
+		var data = JSON.parse(inEvent.data);
+		this.log("message data=", data);
+		switch(data.code) {
+			case 200: // we're good, ignore
+				break;
+			case 500:
+				this.boxcarSocket.close();
+				break;
+			default:
+				if(data.provider_id == 316) {
+					this.log("Syncing from Boxcar event!");
+					this.$.SyncAllAccounts.call({ });
+				}
+		}
+	}
 });

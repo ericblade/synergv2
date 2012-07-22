@@ -79,11 +79,19 @@ enyo.kind({
 	},
 	watchFail: function(inSender, inError, inRequest) {
 		this.log("***** watchFail ", inError);
+		if(!this.accounts) {
+			this.getAccounts();
+		}
+	},
+	accountsFailed: function(inSender, inError, inRequest) {
+		this.log();
+		this.$.AccountLoadLabel.setContent("Error loading accounts: " + JSON.stringify(inError));
 	},
 	components: [
 		{ name: "LoadingAccounts", kind: "VFlexBox", components:
 			[
-				{ content: "Loading Accounts..." },
+				{ name: "AccountLoadLabel", content: "Loading Accounts..." },
+				{ name: "ReceivedAccountLabel", content: "" },
 				{ kind: "Spinner", name: "AccountLoadSpinner", showing: true },
 			]
 		},
@@ -308,28 +316,29 @@ enyo.kind({
 		{
 			this.log("**** Setting up account watch ");
 			this.$.watchAccounts.call();
-			//this.$.getAccounts.call({ });
+			this.getAccounts();
 		}
 		else {
-			this.$.getAccounts.call({ });
+			this.getAccounts();
 		}
 		//this.$.accountsList.getAccountsList();
 		//this.$.accounts.getAccounts();
 	},
 	getAccounts: function() {
+		this.log();
 		this.accounts = [];
 		this.$.AccountRepeater.render();
 		this.$.getAccounts.call({});
 	},
 	getAccountTemplates: function(inSender, inResponse) {
 		this.log("*** Getting Account Templates");
-		this.log(inResponse);
 		this.$.templates.getAccountTemplates({ capability: "MESSAGING", capabilitySubtype: "IM", id: "com.ericblade.synergv.account.im" });		
 	},
 	showBackButton: function() {
 		this.$.BackButton.show();
 	},
 	accountsReceived: function(inSender, inResults, inRequest) {
+		this.log(inResults);
 		this.accounts = [];
 		this.numAccounts = inResults.accounts.length;
 		this.numActiveAccounts = 0;
@@ -341,6 +350,7 @@ enyo.kind({
 		if(this.numAccounts == 0)
 		    this.switchToAccountsView();
 		this.log("accountsReceived: i expect details on", this.numAccounts, "accounts!");
+		this.$.AccountLoadLabel.setContent("Loading " + this.numAccounts + " accounts...");
 	},
 	accountInfoReceived: function(inSender, inResults, inRequest) {
 		this.switchToAccountsView();
@@ -353,6 +363,7 @@ enyo.kind({
 			this.numActiveAccounts++;
 		}
 		this.numAccountsReceived++;
+		this.$.ReceivedAccountLabel.setContent("Loaded #" + this.numAccountsReceived);
 		this.log("numAccountsReceived==", this.numAccountsReceived, this.numActiveAccounts);
 		if(!this.noAutoClose)
 		{

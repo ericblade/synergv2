@@ -1,6 +1,6 @@
 {
 	"id": "com.ericblade.synergv",
-	"version": "2.0.0",
+	"version": "2.0.3",
 	"vendor": "Eric Blade",
 	"type": "web",
 	"main": "index.html",
@@ -55,5 +55,5 @@
 	"noWindow": true,
 	"tapToShareSupported": true,
 	"uiRevision":2,
-	"release":"RC6"
+	"release":"Release"
 }

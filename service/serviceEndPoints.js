@@ -985,6 +985,7 @@ var sync = Class.create({
 				if(error){
 					console.log('Error: ',error);
 					console.log('Response: ', response);
+					f.result = { returnValue: false };
 				}else{
 					console.log('There are %s messages in the unread box. The last %s are: ',response.total, response.messages.length);
 					var counter = 0;

@@ -1,3 +1,5 @@
+// TODO: how did we forget to add a DoNotDisturb indicator to somewhere obvious in the app?
+// client.set('saveTranscript', { id:'id', transcript: null})
 // TODO: Search full Just Type doesn't launch if app already open. try other commands as well!
 // TODO: Search should launch straight to the search page instead of loading Inbox first
 
@@ -620,7 +622,8 @@ enyo.kind({
 									[
 										{ name: "ComposeContent", content: "Compose Text" },
 									]
-								}
+								},
+								{ name: "AboutView", kind: "AboutView", onBack: "RightViewBack" },
 							]
 						},
 					]
@@ -628,6 +631,9 @@ enyo.kind({
 			]
 		}
 	],
+	openAbout: function() {
+		this.$.RightPane.selectViewByName("AboutView");
+	},
 	doSearch: function(str) {
 		enyo.application.adjustAccessCount(1);		
 		this.$.getVoiceMessages.call(
@@ -1024,7 +1030,7 @@ enyo.kind({
 	},
 	components: [
 		{kind: "ApplicationEvents", /*onApplicationRelaunch: "applicationRelaunchHandler",*/ onWindowParamsChange: "applicationRelaunchHandler" },
-		{ name: "PhoneHome", kind: "WebService", url: "http://www.ericbla.de/synergv/prerelease.php" },
+		{ name: "PhoneHome", kind: "WebService", url: "http://www.ericbla.de/synergv/release.php" },
         { name: "mainSpinner", kind: "SpinnerLarge", style: "position: absolute; top: 45%; left: 45%; z-index: 10;", showing: false },
 		{ name: "getAuthKey", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "fetchAuthKey", onSuccess: "authKeyReceived", onFailure: "authKeyFailed" },
 		{ name: "CreateVoicemailDir", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "createVoicemailDir" },
@@ -1044,6 +1050,7 @@ enyo.kind({
 		},
 		{ kind: "AppMenu", lazy: false, components:
 			[
+				{ caption: "About", onclick: "openAbout" },
 				{ caption: "Boxcar Notification", onclick: "openBoxCarView" },
 				{ caption: "Preferences & Accounts", onclick: "selectAccountsView" },
 				{ caption: "Sync List to Messaging", onclick: "syncList" },				
@@ -1089,6 +1096,9 @@ enyo.kind({
 			]
 		},		
 	],
+	openAbout: function() {
+		this.$.MainView.openAbout();
+	},
 	setBox: function(inSender, str) {
 		this.log();
 		this.$.boxPicker.setValue(str);
@@ -1121,6 +1131,7 @@ enyo.kind({
 	},
 	openBoxCarView: function(inSender, inEvent) {
 		this.$.MainPane.selectViewByName("BoxCarView");
+		this.$.BoxCarView.render();
 	},
 	settingsReceived: function() {
 		var set = enyo.application.settings.settings;
@@ -1168,6 +1179,11 @@ enyo.kind({
 		var appInfo = enyo.fetchAppInfo();
 		params.release = appInfo ? appInfo.release : "unknown";
 		params.v = appInfo ? appInfo.version : "chrome";
+		if(params.release == "release") {
+			this.$.PhoneHome.setUrl("http://www.ericbla.de/synergv/release.php");
+		} else {
+			this.$.PhoneHome.setUrl("http://www.ericbla.de/synergv/prerelease.php");
+		}
 		this.$.PhoneHome.call(params);
 	},
 	applicationRelaunchHandler: function(inSender) {
@@ -1237,6 +1253,7 @@ enyo.kind({
 	rendered: function() {
 		this.inherited(arguments);
 		this.$.CreateVoicemailDir.call({ });
+        enyo.asyncMethod(this, "checkFirstRun");
 	},
 	selectAccountsView: function(inSender, inEvent) {
 		this.$.MainPane.selectViewByName("AccountsView");
@@ -1271,6 +1288,27 @@ enyo.kind({
 		
 		enyo.log("authKeyFailed", inError);
 	},
+    checkFirstRun: function() {
+        var appInfo;
+        console.log("checkFirstRun");
+        try {
+            appInfo = JSON.parse(enyo.fetchAppInfo());
+        } catch(err) {
+            appInfo = enyo.fetchAppInfo();
+        }
+        var appver = appInfo ? appInfo.version : "0.0.0";
+        console.log("appInfo version " + appInfo.version);
+        
+        if(localStorage["firstrun"] != appver)
+        {
+            var url = "http://www.ericbla.de/synergv/new-in-v2/";
+            localStorage["firstrun"] = appver;
+            enyo.windows.addBannerMessage("SynerGV: What's New", '{}', "mainApp/images/google-voice-icon24.png", "/media/internal/ringtones/Triangle (short).mp3")
+			this.openBrowser();
+			this.$.Browser.setUrl(url);
+        }    
+    },
+	
 });
 
 enyo.kind({
@@ -1383,7 +1421,8 @@ enyo.kind({
 				{ kind: "RowGroup", caption: "Step 2: Enter your Boxcar login info", components:
 					[
 						{ className: "enyo-item-secondary", content: "To disable Boxcar in SynerGV, set the username to blank." },
-						{ name: "BoxcarUsername", kind: "Input", inputType: "email", hint: "Enter Boxcar.io Username Here", label: "Username", onchange: "usernameChanged" },
+						{ name: "BoxcarUsername", kind: "Input", spellcheck: false, autocorrect: false, autoCapitalize: "lowercase", autoWordComplete: false,
+							inputType: "email", hint: "Enter Boxcar.io Username Here", label: "Username", onchange: "usernameChanged" },
 						{ name: "BoxcarPassword", kind: "PasswordInput", hint: "Enter Boxcar.io Password Here", label: "Password", onchange: "passwordChanged" },
 					],
 				},
@@ -1424,9 +1463,11 @@ enyo.kind({
 	},
 	rendered: function() {
 		this.inherited(arguments);
+		this.log("Boxcar View grabbing preferences..");
 		this.$.Prefs.fetchPreferences(["synergvBoxcarUsername", "synergvBoxcarPassword" ]);
 	},
-	receivedPrefs: function(inPrefs) {
+	receivedPrefs: function(inSender, inPrefs) {
+		this.log();
 		if(inPrefs.synergvBoxcarUsername !== undefined) this.$.BoxcarUsername.setValue(inPrefs.synergvBoxcarUsername);
 		if(inPrefs.synergvBoxcarPassword !== undefined) this.$.BoxcarPassword.setValue(inPrefs.synergvBoxcarPassword);
 	}
@@ -1457,6 +1498,54 @@ enyo.kind({
 	}
 });
 
+enyo.kind({
+	name: "AboutView",
+	kind: "HFlexBox",
+	events: {
+		"onBack": "",
+	},
+	components: [
+		{ kind: "Spacer", },
+		{ kind: "VFlexBox", components:
+			[
+				{ kind: "HFlexBox", components:
+					[
+						{ kind: "enyo.Image", src: "images/synergv64.png" },
+						{ kind: "VFlexBox", align: "center", pack: "center", components:
+							[
+								{ content: "SynerGV v2 for webOS 3+" },
+								{ allowHtml: true, content: "&copy; Eric Blade 2011-2012", className: "enyo-item-ternary" },
+							]
+						}
+					]
+				},
+				{ kind: "Spacer" },
+				{ allowHtml: true, content: "Google Voice&trade; service operated by Google, Inc." },
+				{ kind: "Spacer" },
+				{ content: "Back end powered by node-google-voice by Alex 'Amper5and' S." },
+				{ kind: "Spacer" },
+				{ content: "Front end powered by EnyoJS v1" },
+				{ kind: "Spacer" },
+				{ content: "Icons and Images by Eric Blade, iconshock.com, Asle Høeg-Mikkelsen, and Hewlett-Packard" },
+				{ kind: "Spacer" },
+				{ content: "Special thanks to all the SynerGV testers, webosnation.com, everyone who's mailed in feedback!" },
+				{ kind: "Spacer" },
+				{ content: "Most of all: Thank you very much, everyone who has supported SynerGV and other webOS developers." },
+				{ content: "We couldn't do this all without your support." },
+				{ kind: "Spacer" },
+				{ kind: "HFlexBox", components:
+					[
+						{ content: "GO OPEN WEBOS!" },
+					]
+				},
+				{ kind: "Spacer" },
+				{ kind: "Button", caption: "Back", onclick: "doBack" },
+			]
+		},
+		{ kind: "Spacer" },
+	]
+});
+
 // TODO: move all below this into later version probably
 // TODO: make multiselection work for calls to messaging compose, if possible?
 // TODO: audit the commented out Email Notifications options to be sure that these can even be changed reliably .. it ain't working right.
@@ -1471,3 +1560,71 @@ enyo.kind({
 // TODO: patch the "Block Sender" and "Delete Conversation" buttons in Messaging to send the commands to google too
 // TODO: rename toggleToaster to openMenu ?
 // TODO: need to use message type (10/11 for text conversations?) to determine if they are sms .. deleted items still show very little useful info
+
+
+/* Custom account validator UI discussion
+ * (8:56:55 AM) filmor: https://github.com/filmor/webos-messaging/blob/master/application/validator_enyo.html
+(8:57:06 AM) EricBlade: last time i looked into the code that made it all work was around january, and my head was still swimming at the complexity of it then
+(8:57:23 AM) filmor: this file is the starting point
+(8:57:31 AM) filmor: the parameters are in the windowParams
+(8:57:43 AM) filmor: next step: https://github.com/filmor/webos-messaging/blob/master/application/source/Validator.js
+(8:57:55 AM) filmor: in create the params are handled
+(8:58:43 AM) filmor: you have the whole template (i.e. the template.json-file you're providing as the account template) in either params.initialTemplate or params.template
+(9:00:45 AM) EricBlade: that's kind of a bright idea passing the windowParams to create
+(9:00:52 AM) filmor: I think it's always params.template in webOS 3, but the documentation on this stuff is extremely foggy
+(9:01:16 AM) EricBlade: ok, your accounts json is making me go WTF .. is there something that pre-parses that, or did i miss something in docs?
+(9:01:38 AM) filmor: hihi
+(9:01:44 AM) filmor: I'm just lazy as hell
+(9:01:58 AM) EricBlade: isn't that why we're programmers?
+(9:02:09 AM) filmor: I didn't care to write this stuff again and again, so I "invented" my own json-template-language ;)
+(9:02:31 AM) filmor: makes it easy to add new accounts
+(9:02:53 AM) filmor: look at prototype.json
+(9:03:01 AM) filmor: that's kindof the "master-template"
+(9:03:08 AM) filmor: especially "@template" in there
+(9:03:25 AM) filmor: that's where everything get's substituted in
+(9:03:27 AM) GarthPS: filmor: thx!!
+(9:03:44 AM) filmor: GarthPS, you're welcome :)
+(9:04:12 AM) GarthPS: is there a way to list or to know the list of request we can pass the palm://com.palm.telephony// ?
+(9:04:46 AM) EricBlade: GarthPS: well.. it's a bit of a stretch, but if you can find the binary that implements the com.palm.telephony service, you can run "strings" on it
+(9:05:24 AM) GarthPS: EricBlade: hm yeah right
+(9:05:39 AM) GarthPS: was hoping there was already a list of it :)
+(9:05:51 AM) EricBlade: you might also try calling .. palm://com.palm.telephone/__info  .. 
+(9:06:05 AM) EricBlade: (that's two underscores)
+(9:06:59 AM) EricBlade: doesn't look like that works very well though
+(9:07:12 AM) GarthPS: :)
+(9:07:12 AM) EricBlade: the code descibes "All services support an __info method" .. but the three i just tried didn't
+(9:07:28 AM) GarthPS: :p
+(9:07:28 AM) filmor: use the public bus
+(9:07:42 AM) filmor: the problem is are the permissions though, I guess
+(9:07:59 AM) EricBlade: i see the service controller registers __info on both the public and private bus
+(9:08:04 AM) EricBlade: but that may only apply to javascript services
+(9:08:21 AM) GarthPS: filmor: which is the bus?
+(9:08:51 AM) filmor: luna-send will use the private bus unless you explicitely tell it to use the public one using -P
+(9:09:02 AM) GarthPS: is there a qdbus ?
+(9:09:11 AM) EricBlade: if i call that on my own node service, it gives me the contents of service.json
+(9:09:37 AM) EricBlade: which i don't think the native services have, otherwise we could just look in there
+(9:11:58 AM) EricBlade: cant call telephony on the public bus, and __info isn't registered for it on the private
+(9:12:21 AM) filmor: hmm
+(9:12:33 AM) filmor: i can't find it in the sources
+(9:13:31 AM) filmor: but I know there where some magic methods …
+(9:13:36 AM) filmor: like __quit
+(9:14:23 AM) EricBlade: filmor: ok, so, it goes .. validator { customUI { appId, name }, address } .. where appId is the app to launch, name is ??, and address is .. uh.. obv a function call for something, but wouldn't the customUI perform that function? or is that so the customUI knows what function to perform?
+(9:16:53 AM) filmor: I don't think address is needed when customUI is specified
+(9:17:07 AM) filmor: name is the html-file in the application directory
+(9:17:15 AM) filmor: i.e. "validator/index.html"
+(9:17:29 AM) filmor: but only on webos 3 :)
+(9:17:39 AM) filmor: on webos 2 it's the scene name
+(9:19:29 AM) EricBlade: ok, so then your validator app takes whatever input is needed from the user, and then calls checkCredentials or whatever on it ? 
+(9:19:33 AM) YeahRight left the room (quit: ).
+(9:20:51 AM) Loudergood [~rprwoo@c-174-62-140-119.hsd1.vt.comcast.net] entered the room.
+(9:21:44 AM) filmor: the validator can do whatever it wants
+(9:22:03 AM) filmor: it just needs to use CrossAppResult to return the credentials
+(9:22:50 AM) filmor: https://github.com/filmor/webos-messaging/blob/master/application/source/Validator.js#L92
+(9:23:43 AM) wicket64 [~wicket@81-86-240-143.dsl.pipex.com] entered the room.
+(9:24:11 AM) filmor: I just return the credentials-object as I got it from the validator, I'll look up which format it has exactly
+(9:26:09 AM) filmor: {"credentials": {"common": {"password": pass }}, "username": user, "config": your-configuration-stuff }
+(9:26:47 AM) filmor: and maybe also "returnValue": true, I guess
+(9:27:10 AM) filmor: yep, you'll need that, that's how the ui decides if it should procede
+(9:29:26 AM) filmor: and if you want to use config: the accounts-ui won't handle saving this for you, you'll have to do that on your own in onCreate
+(9:29:34 AM) filmor: tripped into that one ;)
+*/
