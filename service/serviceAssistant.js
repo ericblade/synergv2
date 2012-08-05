@@ -1,5 +1,12 @@
 serviceAssistant = Class.create({
     setup: function() {
+        child_process.exec("rm ./*.txt");
+        try{
+            deleteDirRecursive("/tmp/synergvtemp");
+        } catch(err) {
+            
+        }
+        fs.mkdirSync('/tmp/synergvtemp', 0777);
 		PalmCall.call("palm://com.palm.applicationManager/", "launch", { id: "com.ericblade.synergv", params: { cmd: "noWindow" } });
         var prefsFuture = PalmCall.call("palm://com.palm.systemservice/", "getPreferences",
                                     {

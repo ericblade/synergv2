@@ -3,8 +3,8 @@ var jsdom = require('jsdom');
 var fs = require('fs');
 
 console.log("doJSDOM: reading files");
-var html = fs.readFileSync('./jsdominput'+process.argv[2]+'.txt');
-var messages = JSON.parse(fs.readFileSync('./jsdommessages'+process.argv[2]+'.txt'));
+var html = fs.readFileSync('/tmp/synergvtemp/jsdominput'+process.argv[2]+'.txt');
+var messages = JSON.parse(fs.readFileSync('/tmp/synergvtemp/jsdommessages'+process.argv[2]+'.txt'));
 var document = jsdom.jsdom(html,jsdom.level(2, 'html'));
 console.log("DOM created");
 
@@ -40,7 +40,7 @@ for(var msgId in messages){
     msgArray.push(msg);
 }
 
-fs.writeFileSync('./jsdomoutput'+process.argv[2]+'.txt', JSON.stringify(msgArray));
+fs.writeFileSync('/tmp/synergvtemp/jsdomoutput'+process.argv[2]+'.txt', JSON.stringify(msgArray));
 function isMessage(msg,type){
         return !!~msg.labels.indexOf(type);
 };

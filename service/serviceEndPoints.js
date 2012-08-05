@@ -1358,40 +1358,6 @@ var createVoicemailDir = Class.create({
 	}
 });
 
-function deleteDirRecursive(path, failSilent) {
-    var files;
-
-    try {
-        files = fs.readdirSync(path);
-    } catch (err) {
-        if(failSilent) {
-			return;
-		}
-        throw new Error(err.message);
-    }
-
-    /*  Loop through and delete everything in the sub-tree after checking it */
-    for(var i = 0; i < files.length; i++) {
-        var currFile = fs.lstatSync(path + "/" + files[i]);
-
-        if(currFile.isDirectory()) { // Recursive function back to the beginning
-            exports.rmdirSyncRecursive(path + "/" + files[i]);
-		}
-
-        else if(currFile.isSymbolicLink()) { // Unlink symlinks
-            fs.unlinkSync(path + "/" + files[i]);
-		}
-
-        else {// Assume it's a file - perhaps a try/catch belongs here?
-            fs.unlinkSync(path + "/" + files[i]);
-		}
-    }
-
-    /*  Now that we know everything in the sub-tree has been deleted, we can delete the main
-        directory. Huzzah for the shopkeep. */
-    return fs.rmdirSync(path);
-}
-
 var deleteVoicemailDir = Class.create({
 	run: function(future) {
 		deleteDirRecursive("/media/internal/.synergv");

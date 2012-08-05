@@ -38,6 +38,7 @@ enyo.kind({
                 this.$.SyncAllAccounts.call({ });
                 break;
             case "noWindow":
+				this.noWindowLaunch = true;
                 return true;
 			case "search":
 				return false; // pass this thru to the app
@@ -163,7 +164,11 @@ enyo.kind({
             if(this.Online && !this.shuttingDown)
             {
 				this.connectBoxcar();
-				this.$.SyncAllAccounts.call({ });
+				if(!this.noWindowLaunch) {
+					this.$.SyncAllAccounts.call({ });
+				} else {
+					this.noWindowLaunch = false; // it'll be reset on each occuring noWindow launch, so we unset it here.
+				}
             } else {
             }
         }

@@ -1,6 +1,6 @@
 {
 	"id": "com.ericblade.synergv",
-	"version": "2.0.3",
+	"version": "2.0.7",
 	"vendor": "Eric Blade",
 	"type": "web",
 	"main": "index.html",
@@ -13,27 +13,34 @@
 	"universalSearch": {
 		"dbsearch": {
 			"displayName": "SynerGV Messages",
-			"url": "com.palm.app.messaging",
-			"launchParam": "message",
-			"launchParamDbField": "conversations",
+			"url": "com.ericblade.synergv",
+			"launchParam": "messageText",
+			"launchParamDbField": "messageText",
 			"displayFields":
 				[ "from.addr", "to.addr", "messageText" ],
-			"dbQuery": {
-				"from": "com.ericblade.synergv.immessage:1",
-				"select": [
-					"from.addr", "to.addr", "messageText", "conversations"
-				],
-				"where": [
+			"dbQuery":
+			[
+				{
+					"method": "search",
+					"params":
 					{
-						"prop":"messageText",
-						"op":"?",
-						"val":"",
-						"collate": "primary"
+						"query":
+						{
+							"from": "com.ericblade.synergv.immessage:1",
+							"where": [
+								{
+									"prop":"messageText",
+									"op":"?",
+									"val":"",
+									"collate": "primary"
+								}
+							],
+							"orderBy": "localTimestamp",
+							"limit": 20
+						}
 					}
-				],
-				"orderBy": "localTimestamp",
-				"limit": 20
-			}
+				}
+			]
 		},
 		"action": {
 			"displayName": "Place call with SynerGV",
