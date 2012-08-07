@@ -1711,3 +1711,44 @@ var setContactInfo = Class.create({
 		return future;
 	}
 });
+
+var setupDbPerms = Class.create({
+	run: function(future) {
+		var permissions = 
+		[
+			{
+				"type": "db.kind",
+				"object": "com.ericblade.synergv.configuration:1",
+				"caller": "com.ericblade.*",
+				"operations": {
+					"read": "allow"
+				}
+			},
+			{
+				"type": "db.kind",
+				"object": "com.ericblade.synergv.immessage:1",
+				"caller": "com.ericblade.*",
+				"operations": {
+					"read": "allow", 
+					"create": "allow",
+					"delete": "allow",
+					"update": "allow"
+				}
+			},
+			{
+				"type": "db.kind",
+				"object": "com.ericblade.synergv.immessage:1",
+				"caller": "com.palm.*",
+				"operations": {
+					"read": "allow",
+					"create": "allow",
+					"delete": "allow",
+					"update": "allow"
+				}
+			}
+		];
+		PalmCall.call("palm://com.palm.db/", "putPermissions", { permissions: permissions });
+		future.result = { returnValue: true };
+		return future;
+	}
+})

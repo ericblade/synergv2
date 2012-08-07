@@ -122,9 +122,9 @@ enyo.kind({
 			setTimeout(enyo.bind(this, this.connectBoxcar), 2000);
 			//this.connectBoxcar();
 		}), 30000);
-			this.socketInterval = setInterval(enyo.bind(this, function() {
+			/*this.socketInterval = setInterval(enyo.bind(this, function() {
 				this.log("boxcarSocket state=", this.boxcarSocket.readyState);
-			}), 5000);
+			}), 5000);*/
 
 		this.boxcarSocket.onopen = enyo.bind(this, this.socketOpen);
 		this.boxcarSocket.onerror = enyo.bind(this, this.socketError);

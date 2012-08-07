@@ -139,7 +139,7 @@ enyo.kind({
 		},
 		{ kind: "Toolbar", components:
 			[
-				{ name: "BackButton", icon: "images/back.png", onclick: "doBack" },
+				{ name: "BackButton", icon: "images/new/back_white.png", onclick: "doBack" },
 				{ kind: "Spacer" },
 				{ name: "RedialButton", caption: "Redial", onclick: "redial", disabled: true },
 				{ kind: "Spacer" },

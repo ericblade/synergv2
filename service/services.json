@@ -44,7 +44,8 @@
 				{ "name": "setMessageFlag", "assistant": "setMessageFlag", "public": true },
 				{ "name": "getBillingCredit", "assistant": "getBillingCredit", "public": true },
 				{ "name": "setContactInfo", "assistant": "setContactInfo", "public": true },
-				{ "name": "syncDeleted", "assistant": "syncDeleted", "public": true }
+				{ "name": "syncDeleted", "assistant": "syncDeleted", "public": true },
+				{ "name": "setupDbPerms", "assistant": "setupDbPerms", "public": true }
 			]
         }
     ]

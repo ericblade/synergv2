@@ -99,7 +99,7 @@ enyo.kind({
 						{ kind: "ToolButtonGroup", components:
 							[
 								{ name: "AddContactButton", icon: "images/contactsaddnew.png", /*caption: "Add Contact",*/ onclick: "openContactPopup" },
-								{ name: "MapButton", icon: "images/map_jason_larose.png", /*caption: "Map Location",*/ onclick: "launchMap", },
+								{ name: "MapButton", icon: "images/new/Blade_map.png", /*map_jason_larose.png",*/ /*caption: "Map Location",*/ onclick: "launchMap", },
 								{ name: "ComposeButton", icon: "images/Blade_msg1.png", onclick: "startCompose", },
 								{ name: "CallButton", icon: "images/Blade_phone1.png", onclick: "placeCall", },
 							]
@@ -107,11 +107,11 @@ enyo.kind({
 						{ kind: "Spacer" },
 						{ kind: "ToolButtonGroup", components:
 							[
-								{ name: "StarButton", icon: "images/star-button.png", /*caption: "Star",*/ onclick: "toggleStar" },
-								{ name: "NoteButton", onclick: "openNote", components:
+								{ name: "StarButton", icon: "images/new/Blade_star.png", /*star-button.png",*/ /*caption: "Star",*/ onclick: "toggleStar" },
+								{ name: "NoteButton", icon: "images/new/Blade_note.png", onclick: "openNote", /*components:
 									[
-										{ name: "NoteIcon", kind: "enyo.Image", src: "images/note.png", style: "width: 22px; height: 22px; border: none; padding: 0; margin: 0;" },
-									]
+										{ name: "NoteIcon", kind: "enyo.Image", src: "images/new/Blade_note.png", style: "width: 22px; height: 22px; border: none; padding: 0; margin: 0;" },
+									]*/
 								}, 
 							]
 						},
@@ -119,7 +119,7 @@ enyo.kind({
 						{ kind: "ToolButtonGroup", components:
 							[
 								{ name: "DeleteButton", icon: "images/trash-icon.png", /*caption: "Trash",*/ onclick: "toggleTrash" },
-								{ name: "DeleteForeverButton", icon: "images/Xbutton.png", onclick: "deletePermanently", },								
+								{ name: "DeleteForeverButton", icon: "images/new/Xbutton.png", onclick: "deletePermanently", },								
 							]
 						},
 						{ kind: "Spacer" },
@@ -422,7 +422,7 @@ enyo.kind({
 		this.$.MarkReadButton.setCaption(bRead ? "Mark Unread" : "Mark Read");
 		this.$.ArchiveButton.setCaption(bArchived ? "UnArchive" : "Archive");
 		//this.$.StarButton.setCaption(bStar ? "UnStar" : "Star");
-		this.$.StarButton.setIcon(bStar ? "images/unstar-button.png" : "images/star-button.png");
+		this.$.StarButton.setIcon(bStar ? "images/new/Blade_unstar.png" : "images/new/Blade_star.png");
 		this.$.SpamButton.setCaption(bSpam ? "UnSpam" : "Spam");
 		//this.$.DeleteButton.setCaption(bTrash ? "UnTrash" : "Trash");
 		this.$.DeleteButton.setIcon(bTrash ? "images/untrash-icon.png" : "images/trash-icon.png");
@@ -474,9 +474,11 @@ enyo.kind({
 		}
 		
 		if(this.message && this.message.note !== "") {
-			this.$.NoteIcon.setSrc("images/note.png");
-		} else {
-			this.$.NoteIcon.setSrc("images/unnote.png");
+			//this.$.NoteIcon.setSrc("images/new/Blade_noteFilled.png");
+			this.$.NoteButton.setIcon("images/new/Blade_noteFilled.png");
+		} else {			
+			//this.$.NoteIcon.setSrc("images/new/Blade_note.png");
+			this.$.NoteButton.setIcon("images/new/Blade_note.png");
 		}
 		
 		this.$.ThreadView.setThread(this.message && this.message.thread);
@@ -557,7 +559,7 @@ enyo.kind({
 						{ name: "SearchInput", kind: "enyo.SearchInput", onkeypress: "searchKeypress", onclick: "searchClick" },
 						{ kind: "Scroller", flex: 1, components:
 							[
-								{ name: "NoMessagesMessage", showing: false, components:
+								{ name: "NoMessagesMessage", showing: true, components:
 									[
 										{ content: "No messages were loaded. If you feel you have reached this message in error, please press the Refresh button." },
 										{ kind: "Button", caption: "Refresh", onclick: "render" },
@@ -732,7 +734,7 @@ enyo.kind({
 		enyo.log("rendered");
 		if(enyo.application.accountId)
 		{
-			enyo.scrim.show();
+			//enyo.scrim.show();
 			if(!enyo.application.settings || !enyo.application.phones) {
 				enyo.application.adjustAccessCount(1);
 				
@@ -765,7 +767,7 @@ enyo.kind({
 	apiSuccess: function(inSender, inResponse, inRequest) {
 		this.log("inResponse total", inResponse.total, inResponse.resultsPerPage);
 		enyo.application.adjustAccessCount(-1);
-		enyo.scrim.hide();
+		//enyo.scrim.hide();
 		if(inRequest.method == "getVoiceMessages") {
 			var oldSelectedId = (this.messages && this.selectedIndex !== undefined && this.messages[this.selectedIndex]) ? this.messages[this.selectedIndex].id : -1;
 			this.log("Prior Selected id=", oldSelectedId);
@@ -843,7 +845,7 @@ enyo.kind({
 	},
 	apiFailure: function(inSender, inError, inRequest) {
 		enyo.application.adjustAccessCount(-1);		
-		enyo.scrim.hide();
+		//enyo.scrim.hide();
 		enyo.log("apiFailure:", inError);
 		enyo.log("apiFailure request:", inRequest);
 	},
@@ -967,7 +969,7 @@ enyo.kind({
 		var oldSelection = this.selectedIndex;
 		if(inRow == -1) {
 			this.$.MessageView.setMessage(undefined);
-			this.$.RightPane.selectViewByName("MessageView");
+			//this.$.RightPane.selectViewByName("MessageView");
 			this.selectedIndex = -1;
 			if(oldSelection !== undefined)
 			    this.$.IndexRepeater.renderRow(oldSelection);
@@ -1031,7 +1033,7 @@ enyo.kind({
 	components: [
 		{kind: "ApplicationEvents", /*onApplicationRelaunch: "applicationRelaunchHandler",*/ onWindowParamsChange: "applicationRelaunchHandler" },
 		{ name: "PhoneHome", kind: "WebService", url: "http://www.ericbla.de/synergv/release.php" },
-        { name: "mainSpinner", kind: "SpinnerLarge", style: "position: absolute; top: 45%; left: 45%; z-index: 10;", showing: false },
+        { name: "mainSpinner", kind: "SpinnerLarge", style: "position: absolute; top: 45%; left: 7%; z-index: 10;", /*style: "position: absolute; top: 45%; left: 45%; z-index: 10;",*/ showing: false },
 		{ name: "getAuthKey", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "fetchAuthKey", onSuccess: "authKeyReceived", onFailure: "authKeyFailed" },
 		{ name: "CreateVoicemailDir", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "createVoicemailDir" },
 		{ name: "DeleteVoicemailDir", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "deleteVoicemailDir" },
@@ -1045,7 +1047,7 @@ enyo.kind({
 				{ kind: "Spacer" },
 				{ name: "PhoneButton", disabled: true, kind: "ToolButton", className: "header-button", icon: "images/Blade_phone1.png", onclick: "callView" },
 				{ name: "VoicemailButton", disabled: true, kind: "ToolButton", className: "header-button", icon: "images/Blade_voice1.png", onclick: "callVoicemail" },
-				{ name: "RefreshButton", disabled: true, kind: "ToolButton", className: "header-button", icon: "images/refresh.png", onclick: "refreshView" },
+				{ name: "RefreshButton", disabled: true, kind: "ToolButton", className: "header-button", icon: "images/new/Blade_refresh.png", onclick: "refreshView" },
 			]
 		},
 		{ kind: "AppMenu", lazy: false, components:

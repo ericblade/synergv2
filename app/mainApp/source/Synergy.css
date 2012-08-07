@@ -114,3 +114,6 @@
 	background:#ffc;
 }
 
+.enyo-menuitem.enyo-checked.enyo-menucheckitem-caption, .enyo-menuitem.enyo-checked .enyo-menucheckitem-caption {
+	background: url(../images/new/Blade_Checkmark.png) center right no-repeat !important;
+}

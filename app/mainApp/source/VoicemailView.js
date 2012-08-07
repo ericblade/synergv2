@@ -27,7 +27,7 @@ enyo.kind({
 		},
 		{ kind: "Toolbar", components:
 			[
-				{ name: "PlayPauseButton", icon: "images/play.png", onclick: "playPauseClicked" },
+				{ name: "PlayPauseButton", icon: "images/new/Blade_start.png", onclick: "playPauseClicked" },
 				// TODO: bring up an editor, after complete offer a "Save Transcription" and a "Save & Donate" option
 				// Save calls setMessageFlag saveTranscript, save & donate calls that and setMessageFlag donate
 				{ name: "EditTranscriptButton", disabled: true, caption: "Edit Transcription" },				
@@ -61,7 +61,7 @@ enyo.kind({
 			this.pausedAudio = !this.pausedAudio;
 		}
 		this.playingAudio = true;
-		this.$.PlayPauseButton.setIcon( (this.playingAudio && !this.pausedAudio) ? "images/pause.png" : "images/play.png");
+		this.$.PlayPauseButton.setIcon( (this.playingAudio && !this.pausedAudio) ? "images/new/Blade_pause.png" : "images/new/Blade_start.png");
 		if(this.pausedAudio)
 		{
 		    this.$.SoundPlayer.audio.pause();
@@ -128,7 +128,7 @@ enyo.kind({
 	{
 		this.playingAudio = false;
 		this.pausedAudio = false;
-		this.$.PlayPauseButton.setIcon("images/play.png");
+		this.$.PlayPauseButton.setIcon("images/new/Blade_start.png");
 		this.$.SoundPlayer.audio.pause();
 		clearInterval(this.playerInterval);
 	},
@@ -153,7 +153,7 @@ enyo.kind({
 		this.pausedAudio = false;
 		this.playingAudio = false;
 		this.$.SoundPlayer.audio.pause();
-		this.$.PlayPauseButton.setIcon("images/play.png");
+		this.$.PlayPauseButton.setIcon("images/new/Blade_start.png");
 		if(this.message && this.message.duration) {
 			this.$.MediaLengthLabel.setContent("0:" + this.message.duration);
 		} else {

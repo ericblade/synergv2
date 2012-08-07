@@ -79,6 +79,7 @@ enyo.kind({
 	},
 	watchFail: function(inSender, inError, inRequest) {
 		this.log("***** watchFail ", inError);
+		this.$.SetupDbPerms.call({});
 		if(!this.accounts) {
 			this.getAccounts();
 		}
@@ -95,6 +96,7 @@ enyo.kind({
 				{ kind: "Spinner", name: "AccountLoadSpinner", showing: true },
 			]
 		},
+		{ name: "SetupDbPerms", kind: "PalmService", service: "palm://com.ericblade.synergv.service/", method: "setupDbPerms" },
 		{ name: "RestartService", kind: "PalmService", service: "palm://com.ericblade.synergv.service/", method: "__quit" },
 		{ name: "Preferences", kind: "PalmService", service: "palm://com.palm.systemservice/", onSuccess: "prefsSuccess", onFailure: "prefsFailure" },
 		{name: "watchAccounts", kind: "DbService", method: "find", dbKind: "com.ericblade.synergv.configuration:1", onSuccess: "getAccounts", onFailure: "watchFail", onWatch: "getAccounts", subscribe: true, reCallWatches: true, resubscribe: true },
@@ -355,7 +357,7 @@ enyo.kind({
 	accountInfoReceived: function(inSender, inResults, inRequest) {
 		this.switchToAccountsView();
 		this.$.AccountLoadSpinner.hide();
-		if(!inResults.result.beingDeleted)
+		if(!inResults.result.beingDeleted && inResults.result["_id"])
 		{
 			this.accounts.push(inResults.result);
 			if(this.$.AccountRepeater)
