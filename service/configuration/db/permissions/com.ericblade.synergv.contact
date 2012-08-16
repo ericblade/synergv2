@@ -1,0 +1,11 @@
+[
+    {
+        "type": "db.kind",
+        "object": "com.ericblade.synergv.contact:1",
+        "caller": "com.ericblade.*",
+        "operations": {
+            "read": "allow",
+            "delete": "allow"
+        }
+    }
+]

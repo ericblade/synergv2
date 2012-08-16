@@ -1,6 +1,9 @@
 var voicemailMp3BaseUrl = 'https://www.google.com/voice/media/send_voicemail/';
-var jsdom = require('jsdom');
+
 var fs = require('fs');
+var servicePath = fs.realpathSync('.');
+var modulePath = servicePath + '/node_modules';
+var jsdom = require(modulePath+'/jsdom/lib/jsdom.js');
 
 console.log("doJSDOM: reading files");
 var html = fs.readFileSync('/tmp/synergvtemp/jsdominput'+process.argv[2]+'.txt');

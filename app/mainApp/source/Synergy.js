@@ -1037,6 +1037,7 @@ enyo.kind({
 		{ name: "getAuthKey", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "fetchAuthKey", onSuccess: "authKeyReceived", onFailure: "authKeyFailed" },
 		{ name: "CreateVoicemailDir", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "createVoicemailDir" },
 		{ name: "DeleteVoicemailDir", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "deleteVoicemailDir" },
+		{ name: "DeleteContactsService", kind: "PalmService", service: "palm://com.palm.db", method: "del", onFailure: "contactsDeleteFail", onSuccess: "contactsDeleteSuccess" },
 		{ name: "PageHeader", kind: "synergv.PageHeader", className: "page-header", components:
 			[
 				{ name: "boxPicker", disabled: true, kind: "synergv.ListSelector", value: "Inbox", onChange: "selectBox", className: "box-picker", items: ["Inbox", "Unread", "All", "Voicemail", "SMS", "Recorded", "Placed", "Received", "Missed", "Starred", "Spam", "Trash", "Search"] },
@@ -1064,6 +1065,7 @@ enyo.kind({
 				//{ name: "EditContactsMenu", caption: "Edit Google Contacts", onclick: "GoogleContacts" },
 				// TODO: the contact editor doesn't scroll right at all in webivew
 				{ name: "EditGroupsMenu", caption: "Edit Google Groups/Circles", onclick: "GoogleGroups" },
+				{ name: "ResetContacts", caption: "Delete All Contacts", onclick: "OpenDeleteContactsPopup" },
 				/*{ caption: "Email Notifications", defaultKind: "MenuCheckItem", components:
 					[
 						{ name: "EmailNotificationsMenu", caption: "Voicemail", onclick: "toggleSetting", settingName: "emailNotificationActive" },
@@ -1096,8 +1098,33 @@ enyo.kind({
 				//{ content: "If the Purchase page does not open immediately, close this window and click the credit button again.", className: "enyo-item-ternary" },
 				{ name: "Browser", style: "height: 580px; width: 100%;", kind: "WebView", url: "https://voice.google.com/" },
 			]
-		},		
+		},
+		{ name: "DeleteContactsPopup", kind: "ModalDialog", components:
+			[
+				{ content: "This option will delete all SynerGV contacts from all SynerGV accounts. You can reload them by opening the Contacts app, and selecting 'Sync Contacts'."},
+				{ content: "Are you sure you wish to delete all contacts?" },
+				{ kind: "Button", caption: "Delete All Contacts", onclick: "DoDeleteContacts" },
+				{ kind: "Button", caption: "Close", onclick: "CloseDeleteContactsPopup" },
+			]
+		}
 	],
+	contactsDeleteSuccess: function(x, y, z) {
+		this.CloseDeleteContactsPopup();
+		this.log(x, y, z);
+	},
+	contactsDeleteFail: function(x, y, z) {
+		this.CloseDeleteContactsPopup();
+		this.log(x, y, z);
+	},
+	OpenDeleteContactsPopup: function() {
+		this.$.DeleteContactsPopup.openAtCenter();
+	},
+	CloseDeleteContactsPopup: function() {
+		this.$.DeleteContactsPopup.close();
+	},
+	DoDeleteContacts: function() {
+		this.$.DeleteContactsService.call({ "query": { "from":"com.ericblade.synergv.contact:1" } });
+	},
 	openAbout: function() {
 		this.$.MainView.openAbout();
 	},
@@ -1190,6 +1217,7 @@ enyo.kind({
 	},
 	applicationRelaunchHandler: function(inSender) {
 		this.log(enyo.windowParams);
+		this.log("palm-command:" + enyo.windowParams["palm-command"]);
 		this.processWindowParams(enyo.windowParams);
 	},
 	syncList: function(inSender, inEvent) {

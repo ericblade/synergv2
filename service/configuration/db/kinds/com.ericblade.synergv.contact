@@ -1,18 +1,35 @@
 {
         "id": "com.ericblade.synergv.contact:1",
         "owner": "com.ericblade.synergv.service",
-        "indexes": [{
+        "indexes":
+        [
+            {
                 "name": "accountId",
-                "props": [{
+                "props": [
+                    {
                         "name": "accountId"
-                }]
-        }, {
-                "name": "accountId_remoteId",
-                "props": [{
-                        "name": "accountId"
-                }, {
+                    }
+                ],
+            },
+            {
+                "name": "remoteId",
+                "props": [
+                    {
                         "name": "remoteId"
-                }]
-        }],
+                    }
+                ]  
+            },
+            {
+                "name": "accountId_remoteId",
+                "props": [
+                    {
+                        "name": "accountId"
+                    },
+                    {
+                        "name": "remoteId"
+                    }
+                ]
+            }
+        ],
         "extends": ["com.palm.contact:1"]
 }

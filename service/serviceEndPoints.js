@@ -273,6 +273,11 @@ var sendIM = Class.create({
 		var assistant = this.controller.service.assistant;
 		console.log("sendIM", JSON.stringify(args));
 		
+		/*future.onError(function(f) {
+			console.log("*** Error sending message. Will re-try later?");
+			f.result = { returnValue: false };
+			future.result = { returnValue: false };
+		});*/
 		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
 			var client = f.result.client;
 			client.connect('sms', {
@@ -290,18 +295,24 @@ var sendIM = Class.create({
 				if(error || !data.ok) {
 					console.log("Error: ", error);
 					console.log("body: ", body);
-					console.log("data.ok: ", data.ok);
-					console.log("data.code: ", data.data.code);
-					switch(data.data.code) {
-						case 20: errormsg = "Invalid Number"; break;
-						case 58: errormsg = "SMS limit reached. Try again later, or send to fewer recipients."; break;
-						case 66: errormsg = "Out of credit."; break;
-						case 67: errormsg = "Destination not supported."; break;
-						default: errormsg = "Unknown error code, please report this error and it's circumstances to blade.eric@gmail.com , thank you."; break;
+					if(data)
+						console.log("data.ok: ", data.ok);
+					if(data && data.data)
+						console.log("data.code: ", data.data.code);
+					if(data.data) {
+						switch(data.data.code) {
+							case 20: errormsg = "Invalid Number"; break;
+							case 58: errormsg = "SMS limit reached. Try again later, or send to fewer recipients."; break;
+							case 66: errormsg = "Out of credit."; break;
+							case 67: errormsg = "Destination not supported."; break;
+							default: errormsg = "Unknown error code, please report this error and it's circumstances to blade.eric@gmail.com , thank you."; break;
+						}
+						future.result = { destination: args.to, status: status,
+											errorcode: data.data.code, errormsg: errormsg,
+											msgId: args.msgId, returnValue: true };
+					} else {
+						future.result = { returnValue: false };
 					}
-					future.result = { destination: args.to, status: status,
-										errorcode: data.data.code, errormsg: errormsg,
-										msgId: args.msgId, returnValue: true };
 				} else {
 					console.log("Message sent");
 					future.result = { status: "successful", msgId: args.msgId, returnValue: true };
@@ -941,7 +952,7 @@ var sync = Class.create({
 				}).then(function(fut) { // TODO: "don't make functions in a loop"
 					if(fut.result.returnValue === true)
 					{
-						if(fut.result.status !== "successful") {
+						if(fut.result.status !== "successful" && fut.result.status) {
 							var dbMsg = {
 								_kind: "com.ericblade.synergv.immessage:1",
 								accountId: args.accountId,
@@ -958,7 +969,8 @@ var sync = Class.create({
 							};
 							DB.put([ dbMsg ]);
 						}
-						mergeIds.push( { "_id": fut.result.msgId, "status": fut.result.status });					
+						if(fut.result.status)
+							mergeIds.push( { "_id": fut.result.msgId, "status": fut.result.status });					
 						//fut.result = { returnValue: true };
 						if(x >= results.length - 1)
 						{
@@ -1079,12 +1091,59 @@ var sync = Class.create({
 		// completing it, we re-create it. i guess.
 		PalmCall.call("palm://com.palm.activitymanager/", "create", newact).then(function(f) {
 			console.log("sync interval complete completed, restarting sync interval at " + newact.activity.schedule.interval);
+			console.log("activity create results=", JSON.stringify(f.result));
 			f.result = { returnValue: true };
 		}, function(f) {
 			console.log("Oh shit, something bad happened, our sync activity is probably dead.");
 			// TODO: trigger the app to display an error to the user ?
 		});
-	}	
+	},
+	timeoutReceived: function(x) {
+		var args = this.controller.args;
+		var assistant = this.controller.service.assistant;
+		var activity = args.$activity;
+		var newact = { };
+
+		console.log("Timeout received! "+x);
+		newact = 
+		{
+			"start": true,
+			"replace": true,
+			"activity": {
+				"name": "SynerGVIncomingSync",
+				"description": "SynerGV incoming message sync",
+				"type": {
+					"background": true,
+					"power": true,
+					"powerDebounce": true,
+					"explicit": true,
+					"persist": true
+				},
+				"requirements": {
+					"internet": true
+				},
+				"schedule": {
+					"precise": true,
+					"interval": parseInt(assistant.syncTime / 60, 10) + "m"
+				},
+				"callback": {
+					"method": "palm://com.ericblade.synergv.service/syncAllAccounts",
+					"params": {}
+				}
+			}
+		};
+		// for some reason, the activity no longer exists by the time we get here, so instead of
+		// completing it, we re-create it. i guess.
+		PalmCall.call("palm://com.palm.activitymanager/", "create", newact).then(function(f) {
+			console.log("sync interval timeoutReceived completed, restarting sync interval at " + newact.activity.schedule.interval);
+			console.log("activity create results=", JSON.stringify(f.result));
+			f.result = { returnValue: true };
+		}, function(f) {
+			console.log("Oh shit, something bad happened, our sync activity is probably dead.");
+			// TODO: trigger the app to display an error to the user ?
+		});
+	}
+	
 });
 
 var syncDeleted = Class.create({
@@ -1220,6 +1279,7 @@ var syncContacts = Class.create({
 					future.result = { returnValue: false, errorCode: error.code, errorText: error.message };
 				} else {
 					//console.log("Contacts received", JSON.stringify(contacts));
+					var counter = 0;
 					contacts.forEach(function(contact, index) {
 						var c = 
 						{
@@ -1261,7 +1321,7 @@ var syncContacts = Class.create({
 							c.ims.push({ serviceName: "type_synergv", type: "type_synergv", label: "type_other", value: pn.phoneNumber });
 						});
 						try {
-							fs.mkdirSync('/media/internal/.synergvimages', 0777);
+							//fs.mkdirSync('/media/internal/.synergvimages', 0777);
 						} catch(err) {
 							
 						}
@@ -1284,13 +1344,39 @@ var syncContacts = Class.create({
 								localPath: "/media/internal/.synergvimages/" + contact.contactId + ".jpg"
 							});
 						}*/
-						dbContacts.push(c);
+						//dbContacts.push(c);
+						var dbQuery = {
+							from: "com.ericblade.synergv.contact:1",
+							where: [
+								{ "prop":"remoteId", "op":"=", "val":c.remoteId }
+							]
+						};
+						DB.find(dbQuery, false, false).then(function(f) {
+							if(f.result.results.length == 0) {
+								DB.put([ c ]);
+								//console.log("add contact " + JSON.stringify(c));
+							} else {
+								DB.merge([ { "_id":
+										  f.result.results[0]["_id"],
+										  nickname: c.nickname,
+										  phoneNumbers: c.phoneNumbers,
+										  ims: c.ims,
+										  emails: c.emails,
+										  photos: c.photos } ]);
+								//console.log("merge contact " + JSON.stringify(c));
+							}
+							//console.log("counter = " + counter + " length=" + contacts.length);
+							if(counter++ >= contacts.length-1) {
+								console.log("dealt with " + counter + " contacts.");
+								future.result = { returnValue: true };
+							}
+						});
 						//console.log(JSON.stringify(c));
 					});
-					DB.put(dbContacts).then(function(f) {
+					/*DB.put(dbContacts).then(function(f) {
 						console.log("put", f.result.results.length, "contacts");
 						future.result = f.result; //{returnValue: true };//f.result;
-					});
+					});*/
 				}
 			});
 		}));
@@ -1659,6 +1745,9 @@ var getBillingCredit = Class.create({
 			var client = f.result.client;
 			client.connect('getBillingCredit', args.options, function(error, response, body) {
 				var data;
+				console.log("getBillingCredit, error=" + error);
+				console.log("getBillingCredit, response=" + response);
+				console.log("getBillingCredit, body=" + body);
 				try {
 					data = JSON.parse(body);
 				} catch(err) {
@@ -1669,12 +1758,16 @@ var getBillingCredit = Class.create({
 					console.log("Error: ", error);
 					console.log("body: ", body);
 					console.log("data.ok: ", data.ok);
-					console.log("data.code: ", data.data.code);
-					future.result = { errorcode: data.data.code, errormsg: errormsg,
-										returnValue: false };
+					if(data && data.data) {
+						console.log("data.code: ", data.data.code);
+						future.result = { errorcode: data.data.code, errormsg: errormsg,
+											returnValue: false };
+					} else {
+						future.result = { returnValue: false };
+					}
 				} else {
-					console.log("Billing Credit received " + JSON.stringify(response.body));
-					future.result = { returnValue: true, credit: JSON.parse(response.body) };
+					//console.log("Billing Credit received " + JSON.stringify(response.body));
+					future.result = { returnValue: true, credit: JSON.parse(body) };
 				}
 			});
 		}));
@@ -1730,6 +1823,17 @@ var setupDbPerms = Class.create({
 				"caller": "com.ericblade.*",
 				"operations": {
 					"read": "allow", 
+					"create": "allow",
+					"delete": "allow",
+					"update": "allow"
+				}
+			},
+			{
+				"type": "db.kind",
+				"object": "com.ericblade.synergv.contact:1",
+				"caller": "com.ericblade.*",
+				"operations": {
+					"read": "allow",
 					"create": "allow",
 					"delete": "allow",
 					"update": "allow"
