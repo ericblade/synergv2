@@ -63,6 +63,10 @@ var getVoiceMessages = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
 		var assistant = this.controller.service.assistant;
+		future.onError(function (f) {
+			console.log("**** getVoiceMessages error! " + JSON.stringify(f.exception));
+			future.result = { returnValue: false };
+		});
 		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
 			var GVclient = f.result.client;
 			var start = ( ((args.page || 1) - 1) * 10) + 1;
@@ -89,6 +93,11 @@ var checkCredentials = Class.create({
 		var assistant = this.controller.service.assistant;
 		console.log("checkCredentials", args.username, args.password);
 		
+		future.onError(function (f) {
+			console.log("**** checkCredentials error! " + JSON.stringify(f.exception));
+			future.result = { returnValue: false };
+		});
+
 		var GVclient = new GV.Client({ email: args.username, password: args.password });
 		future.now(function() {
 			GVclient.getRNRSE(function(error, response) {
@@ -877,6 +886,11 @@ var sync = Class.create({
 		var msgTexts = [];
 		var username = this.username;
 		var GVclient;
+
+		syncFuture.onError(function (f) {
+			console.log("**** sync error! " + JSON.stringify(syncFuture));
+			future.result = { returnValue: false };
+		});
 	
 		args.markMessagesRead = args.markMessagesRead || assistant.markReadOnSync;
 		args.inbox = args.inbox || (assistant.syncInbox === true ? "inbox" : undefined); 
@@ -1268,6 +1282,10 @@ var syncContacts = Class.create({
 		var dbContacts = [];
 
 		console.log("sync contacts begin " + args.accountId);		
+		future.onError(function (f) {
+			console.log("**** syncContacts error! " + JSON.stringify(f.result));
+			future.result = { returnValue: false };
+		});
 		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
 			var GVclient = f.result.client;
 			GVclient.getContacts(function(error, contacts) {
@@ -1455,7 +1473,13 @@ var httpsRequest = Class.create({
 	run: function(future)
 	{
 		var args = this.controller.args;
-		if(https === undefined)
+		var nodehttps;
+		/*try {
+			nodehttps = require('https');
+		} catch(err) {
+			
+		}*/
+		if(nodehttps === undefined)
 		{
 			console.log("https using curl?");
 			var host = args.host || "www.google.com";
@@ -1509,11 +1533,11 @@ var httpsRequest = Class.create({
 			/* Some logging to make sure we're alive -- tail -f /var/log/messages to
 			* watch for service logs
 			*/
-			console.log("HOST:", options.host, "PORT:", options.port);
+			console.log("HOST:", options.host, "PORT:", options.port, "Options:" + JSON.stringify(options));
 			/* Call to the Node library to perform the https request -- This will
 			* not actually start processing until we fire request.end()
 			*/
-			var request = https.request(options,
+			var request = nodehttps.request(options,
 				function(result) {
 					/* When we receive data, concat it to the recdata cache, throw a
 					* log just so the operator can see we're alive
@@ -1524,7 +1548,7 @@ var httpsRequest = Class.create({
 							console.log("received some data");
 						}
 					);
-					if(args.binary) {
+					if(args.binary && result && result.setEncoding) {
 						result.setEncoding('binary');
 					}
 					/* The future will not return until we set thisfuture.result,
@@ -1586,6 +1610,10 @@ var getGVSettings = Class.create({
 		var assistant = this.controller.service.assistant;
 		var args = this.controller.args;
 		
+		future.onError(function (f) {
+			console.log("**** getGVSettings error! " + JSON.stringify(f.exception));
+			future.result = { returnValue: false };
+		});
 		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
 			var GVclient = f.result.client;
 			GVclient.getSettings(function(err, settings) {
@@ -1740,6 +1768,10 @@ var getBillingCredit = Class.create({
 		var assistant = this.controller.service.assistant;
 		console.log("getBillingCredit", JSON.stringify(args));
 		
+		future.onError(function (f) {
+			console.log("**** ERROR IN getBillingCredit call!! " + JSON.stringify(f.exception));
+			future.result = { returnValue: false };
+		});
 		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
 			console.log("sending with client ", JSON.stringify(f.result.client));
 			var client = f.result.client;

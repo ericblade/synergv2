@@ -68,7 +68,19 @@ serviceAssistant = Class.create({
             then(future.callback(this, function(f) {
                 password = Base64.decode(f.result.keydata);
                 console.log("auth details: ", username, password, rnrse, auth);
-                this.GVClients[accountId] = new GV.Client({ email: username, password: password, rnr_se: rnrse, authToken: auth });
+                this.GVClients[accountId] = new GV.Client({ email: username, password: password , rnr_se: rnrse, authToken: auth });
+                /*console.log("***** GV Client authToken: " + this.GVClients[accountId].config.authToken);
+                if(this.GVClients[accountId].config && this.GVClients[accountId].config.authToken && auth != this.GVClients[accountId].config.authToken) {
+                    var accountstore = {
+                        objects: [{
+                            _kind: "com.ericblade.synergv.configuration:1",
+                            accountId: accountId
+                        }]
+                    };
+                    PalmCall.call("palm://com.palm.db/", "put", accountstore).then(function(fut2) {
+                        var keystore3 = { "keyname":"GVAuth:"+args.accountId, "keydata": Base64.encode(args.config.auth), "type": "AES", "nohide":true };
+                    });
+                }*/
                 future.result = { client: this.GVClients[accountId], returnValue: true };
             })));
         return future;

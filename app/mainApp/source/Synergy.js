@@ -85,44 +85,48 @@ enyo.kind({
 		{ name: "PlayBox", kind: "VoicemailView", showing: false },
 		{ name: "MenuToaster", lazy: false, className: "menu-toaster", kind: "synergv.Toaster", myOpen: false, flyInFrom: "top", components:
 			[
-				{ kind: "Toolbar", defaultKind: "GroupedToolButton", components:
+				{ kind: "Scroller", style: "height: 60px;", horizontal: true, components:
 					[
-						{ kind: "Spacer" },
-						{ kind: "ToolButtonGroup", components:
+						{ kind: "Toolbar", defaultKind: "GroupedToolButton", components:
 							[
-								{ name: "MarkReadButton", caption: "Mark Read", onclick: "toggleRead", },
-								{ name: "ArchiveButton", caption: "Archive", onclick: "toggleArchive" },
-								{ name: "SpamButton", caption: "Spam", onclick: "toggleSpam", },								
-							]
-						},
-						{ kind: "Spacer" },
-						{ kind: "ToolButtonGroup", components:
-							[
-								{ name: "AddContactButton", icon: "images/contactsaddnew.png", /*caption: "Add Contact",*/ onclick: "openContactPopup" },
-								{ name: "MapButton", icon: "images/new/Blade_map.png", /*map_jason_larose.png",*/ /*caption: "Map Location",*/ onclick: "launchMap", },
-								{ name: "ComposeButton", icon: "images/Blade_msg1.png", onclick: "startCompose", },
-								{ name: "CallButton", icon: "images/Blade_phone1.png", onclick: "placeCall", },
-							]
-						},
-						{ kind: "Spacer" },
-						{ kind: "ToolButtonGroup", components:
-							[
-								{ name: "StarButton", icon: "images/new/Blade_star.png", /*star-button.png",*/ /*caption: "Star",*/ onclick: "toggleStar" },
-								{ name: "NoteButton", icon: "images/new/Blade_note.png", onclick: "openNote", /*components:
+								{ kind: "Spacer" },
+								{ kind: "ToolButtonGroup", components:
 									[
-										{ name: "NoteIcon", kind: "enyo.Image", src: "images/new/Blade_note.png", style: "width: 22px; height: 22px; border: none; padding: 0; margin: 0;" },
-									]*/
-								}, 
+										{ name: "MarkReadButton", caption: "Mark Read", onclick: "toggleRead", },
+										{ name: "ArchiveButton", caption: "Archive", onclick: "toggleArchive" },
+										{ name: "SpamButton", caption: "Spam", onclick: "toggleSpam", },								
+									]
+								},
+								{ kind: "Spacer" },
+								{ kind: "ToolButtonGroup", components:
+									[
+										{ name: "AddContactButton", icon: "images/contactsaddnew.png", /*caption: "Add Contact",*/ onclick: "openContactPopup" },
+										{ name: "MapButton", icon: "images/new/Blade_map.png", /*map_jason_larose.png",*/ /*caption: "Map Location",*/ onclick: "launchMap", },
+										{ name: "ComposeButton", icon: "images/Blade_msg1.png", onclick: "startCompose", },
+										{ name: "CallButton", icon: "images/Blade_phone1.png", onclick: "placeCall", },
+									]
+								},
+								{ kind: "Spacer" },
+								{ kind: "ToolButtonGroup", components:
+									[
+										{ name: "StarButton", icon: "images/new/Blade_star.png", /*star-button.png",*/ /*caption: "Star",*/ onclick: "toggleStar" },
+										{ name: "NoteButton", icon: "images/new/Blade_note.png", onclick: "openNote", /*components:
+											[
+												{ name: "NoteIcon", kind: "enyo.Image", src: "images/new/Blade_note.png", style: "width: 22px; height: 22px; border: none; padding: 0; margin: 0;" },
+											]*/
+										}, 
+									]
+								},
+								{ kind: "Spacer" },
+								{ kind: "ToolButtonGroup", components:
+									[
+										{ name: "DeleteButton", icon: "images/trash-icon.png", /*caption: "Trash",*/ onclick: "toggleTrash" },
+										{ name: "DeleteForeverButton", icon: "images/new/Xbutton.png", onclick: "deletePermanently", },								
+									]
+								},
+								{ kind: "Spacer" },
 							]
-						},
-						{ kind: "Spacer" },
-						{ kind: "ToolButtonGroup", components:
-							[
-								{ name: "DeleteButton", icon: "images/trash-icon.png", /*caption: "Trash",*/ onclick: "toggleTrash" },
-								{ name: "DeleteForeverButton", icon: "images/new/Xbutton.png", onclick: "deletePermanently", },								
-							]
-						},
-						{ kind: "Spacer" },
+						}
 					]
 				}
 			]
@@ -493,7 +497,6 @@ enyo.kind({
 		if(!this.message) {
 			this.$.MessageHeader.hide();
 		}
-		
 		this.render();
 	}
 });
@@ -543,11 +546,14 @@ enyo.kind({
 		"onSettingsReceived": "",
 		"onSetPages": "",
 		"onSetBox": "",
+		"onBack": "",
 	},
 	components: [
+		{ kind: "ApplicationEvents", onBack: "goBack" },
 		{ name: "gvapi", kind: "PalmService", service: "palm://com.ericblade.synergv.service", onSuccess: "apiSuccess", onFailure: "apiFailure", components:
 			[
 				{ name: "getVoiceMessages", method: "getVoiceMessages" },
+				{ name: "sync", method: "sync" },
 			]
 		},
 		{ name: "getGVSettings", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "getGVSettings", onSuccess: "settingsReceived", onFailure: "settingsFailed" },
@@ -561,7 +567,7 @@ enyo.kind({
 							[
 								{ name: "NoMessagesMessage", showing: true, components:
 									[
-										{ content: "No messages were loaded. If you feel you have reached this message in error, please press the Refresh button." },
+										{ content: "No messages were loaded. If you feel you have reached this message in error, please check your Internet connection, and then press the Refresh button." },
 										{ kind: "Button", caption: "Refresh", onclick: "render" },
 									]
 								},
@@ -633,8 +639,22 @@ enyo.kind({
 			]
 		}
 	],
+	goBack: function(inSender, inEvent) {
+		if(this.$.Slider.getViewName() == "LeftView") {
+			this.doBack();
+		} else {
+			this.$.Slider.back();
+		}
+		inEvent.preventDefault();
+		return true;
+	},
+	isPhone: function() {
+		return (window.PalmSystem && window.PalmSystem.deviceInfo.platformMajor <= 2) || window.innerWidth < 500;
+	},
 	openAbout: function() {
 		this.$.RightPane.selectViewByName("AboutView");
+		if(this.isPhone)
+			this.$.Slider.selectViewByName("RightView");
 	},
 	doSearch: function(str) {
 		enyo.application.adjustAccessCount(1);		
@@ -711,6 +731,11 @@ enyo.kind({
 							  inbox: enyo.application.inbox ? enyo.application.inbox.toLowerCase() : "inbox",
 							  page: enyo.application.inboxPage ? enyo.application.inboxPage : 1,
 							  });
+			this.$.sync.call({
+				accountId: enyo.application.accountId,
+				inbox: "inbox",
+				page: 1,
+			});	
 		}
 		//enyo.log("** Settings Received! ", inResponse.settings);
 		var phones = [];
@@ -820,13 +845,17 @@ enyo.kind({
 			var cmds = enyo.application.commands;
 			for(var x = 0; x < cmds.length; x++) {
 				switch(cmds[x].cmd) {
-					case "playVoicemail": 
+					case "playVoicemail":
+						if(this.isPhone())
+						    this.$.Slider.selectViewByName("RightView");
 						this.$.RightPane.selectViewByName("VoicemailView");
 						this.$.VoicemailPlayer.setMessageId(cmds[x].msgId);
 						this.$.VoicemailPlayer.playPauseClicked();
 						enyo.application.commands = [ ]; // ok, interactive commands halt any others when processed, i guess
 						break;
 					case "placecall":
+						if(this.isPhone())
+						    this.$.Slider.selectViewByName("RightView");
 						this.$.RightPane.selectViewByName("TelephoneView");
 						this.$.TelephoneView.setPhoneNumber(cmds[x].msgId);
 						enyo.application.commands = [ ];
@@ -858,6 +887,8 @@ enyo.kind({
 		if(!inPhoneNumber && inEvent.rowIndex)
 		    inPhoneNumber = this.messages[inEvent.rowIndex].phoneNumber;
 		this.log(inPhoneNumber);
+		if(this.isPhone())
+		    this.$.Slider.selectViewByName("RightView");
 		this.$.RightPane.selectViewByName("TelephoneView");
 		if(inPhoneNumber)
 		    this.$.TelephoneView.setPhoneNumber(inPhoneNumber);
@@ -976,6 +1007,8 @@ enyo.kind({
 			return;
 		}
 		this.$.MessageView.setMessage(this.messages[inRow]);
+		if(this.isPhone())
+		    this.$.Slider.selectViewByName("RightView");
 		this.$.RightPane.selectViewByName("MessageView");		
 		this.selectedIndex = inRow;
 		if(oldSelection !== undefined && oldSelection > -1)
@@ -1082,7 +1115,7 @@ enyo.kind({
 			[
 				{ name: "AccountsView", kind: "AccountsView",
 					onSelectedAccount: "accountSelected" },
-				{ name: "MainView", kind: "MainView", onSettingsReceived: "settingsReceived", onSetPages: "setPages", onSetBox: "setBox" },
+				{ name: "MainView", kind: "MainView", onSettingsReceived: "settingsReceived", onSetPages: "setPages", onSetBox: "setBox", onBack: "mainBack" },
 				{ name: "BoxCarView", kind: "BoxCarView", onBack: "goBack", className: "box-center", },
 			]
 		},
@@ -1108,6 +1141,12 @@ enyo.kind({
 			]
 		}
 	],
+	mainBack: function(inSender, inEvent) {
+		if(this.$.MainPane.history.length == 0)
+		    this.$.MainPane.selectViewByName("MainView");
+		else
+			this.$.MainPane.back();
+	},
 	contactsDeleteSuccess: function(x, y, z) {
 		this.CloseDeleteContactsPopup();
 		this.log(x, y, z);

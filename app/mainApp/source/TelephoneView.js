@@ -236,7 +236,7 @@ enyo.kind({
 			this.$.PhoneSelector.setValue(this.phones[0].name); // TODO: need to save the last selected phone for this account, and restore it
 		} else {
 			this.$.PhoneSelector.setItems([ "NO PHONES CONFIGURED!" ]);
-			this.$.PhoneSelect.setValue("NO PHONES CONFIGURED!");
+			this.$.PhoneSelector.setValue("NO PHONES CONFIGURED!");
 		}
 	},
 	getPhoneIndexByName: function(str) {
