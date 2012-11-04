@@ -30,6 +30,7 @@
 				{ "name": "storeConversation", "assistant": "storeConversation", "public": true },
 				{ "name": "syncContacts", "assistant": "syncContacts", "public": true },
 				{ "name": "syncAllAccounts", "assistant": "syncAllAccounts", "public": true },
+				{ "name": "timedSyncAllAccounts", "assistant": "timedSyncAllAccounts", "public": true },
 				{ "name": "getAccounts", "assistant": "getAccounts", "public": true },
 				{ "name": "getVoiceMessages", "assistant": "getVoiceMessages", "public": true },
 				{ "name": "downloadVoicemail", "assistant": "downloadVoicemail", "public": true },

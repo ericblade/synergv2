@@ -93,10 +93,12 @@ var checkCredentials = Class.create({
 		var assistant = this.controller.service.assistant;
 		console.log("checkCredentials", args.username, args.password);
 		
-		future.onError(function (f) {
+		/*future.onError(function (f) {
 			console.log("**** checkCredentials error! " + JSON.stringify(f.exception));
-			future.result = { returnValue: false };
-		});
+			future.result = {
+				returnValue: false
+			};
+		});*/
 
 		var GVclient = new GV.Client({ email: args.username, password: args.password });
 		future.now(function() {
@@ -172,6 +174,7 @@ var onCreate = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
 
+		console.log("**** onCreate args=" + JSON.stringify(args));
 		var accountstore = {
 			objects: [{
 				_kind: "com.ericblade.synergv.configuration:1",
@@ -617,7 +620,7 @@ var startActivity = Class.create({
 						"interval": "1m"
 					},
 					"callback": {
-						"method": "palm://com.ericblade.synergv.service/syncAllAccounts",
+						"method": "palm://com.ericblade.synergv.service/timedSyncAllAccounts",
 						"params": {}
 					}
 				}
@@ -888,8 +891,8 @@ var sync = Class.create({
 		var GVclient;
 
 		syncFuture.onError(function (f) {
-			console.log("**** sync error! " + JSON.stringify(syncFuture));
-			future.result = { returnValue: false };
+			console.log("**** sync error! " + JSON.stringify(f.exception));
+			syncFuture.result = { returnValue: false };
 		});
 	
 		args.markMessagesRead = args.markMessagesRead || assistant.markReadOnSync;
@@ -1073,46 +1076,48 @@ var sync = Class.create({
 			PalmCall.call("palm://com.palm.activitymanager/", "complete",  newact).then(function(f) {
 				f.result = { returnValue: true };
 			});
-		} 
-		newact = 
-		{
-			"start": true,
-			"replace": true,
-			"activity": {
-				"name": "SynerGVIncomingSync",
-				"description": "SynerGV incoming message sync",
-				"type": {
-					"background": true,
-					"power": true,
-					"powerDebounce": true,
-					"explicit": true,
-					"persist": true
-				},
-				"requirements": {
-					"internet": true
-				},
-				"schedule": {
-					"precise": true,
-					"interval": parseInt(assistant.syncTime / 60, 10) + "m"
-				},
-				"callback": {
-					"method": "palm://com.ericblade.synergv.service/syncAllAccounts",
-					"params": {}
+		}
+		if(activity && activity.name.indexOf("SynerGVIncomingSync") == 0) {
+			newact = 
+			{
+				"start": true,
+				"replace": true,
+				"activity": {
+					"name": "SynerGVIncomingSync",
+					"description": "SynerGV incoming message sync",
+					"type": {
+						"background": true,
+						"power": true,
+						"powerDebounce": true,
+						"explicit": true,
+						"persist": true
+					},
+					"requirements": {
+						"internet": true
+					},
+					"schedule": {
+						"precise": true,
+						"interval": parseInt(assistant.syncTime / 60, 10) + "m"
+					},
+					"callback": {
+						"method": "palm://com.ericblade.synergv.service/timedSyncAllAccounts",
+						"params": {}
+					}
 				}
-			}
-		};
-		// for some reason, the activity no longer exists by the time we get here, so instead of
-		// completing it, we re-create it. i guess.
-		PalmCall.call("palm://com.palm.activitymanager/", "create", newact).then(function(f) {
-			console.log("sync interval complete completed, restarting sync interval at " + newact.activity.schedule.interval);
-			console.log("activity create results=", JSON.stringify(f.result));
-			f.result = { returnValue: true };
-		}, function(f) {
-			console.log("Oh shit, something bad happened, our sync activity is probably dead.");
-			// TODO: trigger the app to display an error to the user ?
-		});
+			};
+			// for some reason, the activity no longer exists by the time we get here, so instead of
+			// completing it, we re-create it. i guess.
+			PalmCall.call("palm://com.palm.activitymanager/", "create", newact).then(function(f) {
+				console.log("sync interval complete completed, restarting sync interval at " + newact.activity.schedule.interval);
+				console.log("activity create results=", JSON.stringify(f.result));
+				f.result = { returnValue: true };
+			}, function(f) {
+				console.log("Oh shit, something bad happened, our sync activity is probably dead.");
+				// TODO: trigger the app to display an error to the user ?
+			});
+		}
 	},
-	timeoutReceived: function(x) {
+	/*timeoutReceived: function(x) {
 		var args = this.controller.args;
 		var assistant = this.controller.service.assistant;
 		var activity = args.$activity;
@@ -1141,7 +1146,7 @@ var sync = Class.create({
 					"interval": parseInt(assistant.syncTime / 60, 10) + "m"
 				},
 				"callback": {
-					"method": "palm://com.ericblade.synergv.service/syncAllAccounts",
+					"method": "palm://com.ericblade.synergv.service/timedSyncAllAccounts",
 					"params": {}
 				}
 			}
@@ -1156,7 +1161,7 @@ var sync = Class.create({
 			console.log("Oh shit, something bad happened, our sync activity is probably dead.");
 			// TODO: trigger the app to display an error to the user ?
 		});
-	}
+	}*/
 	
 });
 
@@ -1216,6 +1221,59 @@ var syncDeleted = Class.create({
 		});
 		return future;
 	}
+});
+
+var timedSyncAllAccounts = Class.create({
+	run: function(future) {
+		console.log("**** timedSyncAllAccounts run");
+		PalmCall.call("palm://com.ericblade.synergv.service/", "syncAllAccounts", { });
+		future.result = { returnValue: true };
+	},
+	complete: function() {
+		console.log("**** timedSyncAllAccounts complete");
+		var args = this.controller.args;
+		var assistant = this.controller.service.assistant;
+		var activity = args.$activity;
+		var newact = { };
+		newact = 
+		{
+			"start": true,
+			"replace": true,
+			"activity": {
+				"name": "SynerGVIncomingSync",
+				"description": "SynerGV incoming message sync",
+				"type": {
+					"background": true,
+					"power": true,
+					"powerDebounce": true,
+					"explicit": true,
+					"persist": true
+				},
+				"requirements": {
+					"internet": true,
+					"internetConfidence": "fair",
+				},
+				"schedule": {
+					"precise": true,
+					"interval": parseInt(assistant.syncTime / 60, 10) + "m"
+				},
+				"callback": {
+					"method": "palm://com.ericblade.synergv.service/timedSyncAllAccounts",
+					"params": {}
+				}
+			}
+		};
+		// for some reason, the activity no longer exists by the time we get here, so instead of
+		// completing it, we re-create it. i guess.
+		PalmCall.call("palm://com.palm.activitymanager/", "create", newact).then(function(f) {
+			console.log("sync interval complete completed, restarting sync interval at " + newact.activity.schedule.interval);
+			console.log("activity create results=", JSON.stringify(f.result));
+			f.result = { returnValue: true };
+		}, function(f) {
+			console.log("Oh shit, something bad happened, our sync activity is probably dead.");
+			// TODO: trigger the app to display an error to the user ?
+		});
+	}	
 });
 
 var syncAllAccounts = Class.create({
