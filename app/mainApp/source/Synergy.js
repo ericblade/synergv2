@@ -1252,7 +1252,7 @@ enyo.kind({
 		} else {
 			this.$.PhoneHome.setUrl("http://www.ericbla.de/synergv/prerelease.php");
 		}
-		this.$.PhoneHome.call(params);
+		//this.$.PhoneHome.call(params);
 	},
 	applicationRelaunchHandler: function(inSender) {
 		this.log(enyo.windowParams);
@@ -1370,7 +1370,8 @@ enyo.kind({
         
         if(localStorage["firstrun"] != appver)
         {
-            var url = "http://www.ericbla.de/synergv/new-in-v2/";
+            //var url = "http://www.ericbla.de/synergv/new-in-v2/";
+			var url = "http://www.ericbla.de/e107_plugins/forum/forum_viewtopic.php?1";
             localStorage["firstrun"] = appver;
             enyo.windows.addBannerMessage("SynerGV: What's New", '{}', "mainApp/images/google-voice-icon24.png", "/media/internal/ringtones/Triangle (short).mp3")
 			this.openBrowser();
