@@ -1,0 +1,169 @@
+{
+    "returnValue": true,
+    "settings": {
+        "phones": {
+            "1": {
+                "id": 1,
+                "name": "Mobile",
+                "phoneNumber": "+17340000000",
+                "type": 2,
+                "verified": true,
+                "policyBitmask": 0,
+                "dEPRECATEDDisabled": false,
+                "telephonyVerified": true,
+                "smsEnabled": false,
+                "incomingAccessNumber": "",
+                "voicemailForwardingVerified": false,
+                "behaviorOnRedirect": 0,
+                "carrier": "SPRINT",
+                "customOverrideState": 0,
+                "inVerification": false,
+                "lastVerificationDate": "1315463542638",
+                "androidVoipJid": "",
+                "recentlyProvisionedOrDeprovisioned": false,
+                "forwardingCountry": "US",
+                "formattedNumber": "(734) 000-0000",
+                "wd": {
+                    "allDay": false,
+                    "times": []
+                },
+                "we": {
+                    "allDay": false,
+                    "times": []
+                },
+                "scheduleSet": false,
+                "weekdayAllDay": false,
+                "weekdayTimes": [],
+                "weekendAllDay": false,
+                "weekendTimes": [],
+                "redirectToVoicemail": false,
+                "active": true,
+                "enabledForOthers": true
+            }
+        },
+        "phoneList": [
+            1
+        ],
+        "settings": {
+            "primaryDid": "+19519993267",
+            "language": "en",
+            "screenBehavior": 0,
+            "useDidAsCallerId": false,
+            "credits": 0,
+            "timezone": "America/New_York",
+            "doNotDisturb": false,
+            "directRtp": 1,
+            "filterGlobalSpam": 0,
+            "enablePinAccess": 1,
+            "didInfos": [],
+            "primaryDidInfo": {
+                "phoneNumber": "+19519993267",
+                "formattedNumber": "(951) 999-3267",
+                "releaseDidAllowed": true
+            },
+            "lastDeletedDid": "",
+            "smsNotifications": [],
+            "emailNotificationActive": true,
+            "emailNotificationAddress": "synergv@webos.org",
+            "showTranscripts": true,
+            "directConnect": false,
+            "useDidAsSource": false,
+            "emailToSmsActive": false,
+            "i18nSmsActive": false,
+            "missedToInbox": false,
+            "greetings": [
+                {
+                    "id": "0",
+                    "name": "System Standard",
+                    "jobberName": ""
+                }
+            ],
+            "greetingsMap": {},
+            "activeForwardingIds": [
+                1
+            ],
+            "disabledIdMap": {},
+            "defaultGreetingId": 0,
+            "webCallButtons": [],
+            "groups": {
+                "13": {
+                    "id": "13",
+                    "name": "Friends",
+                    "disabledForwardingIds": {},
+                    "isCustomForwarding": false,
+                    "isCustomGreeting": false,
+                    "isCustomDirectConnect": false,
+                    "directConnect": false,
+                    "greetingId": 0,
+                    "isCircle": false,
+                    "isCustomTranscriptionLanguage": false,
+                    "transcriptionLanguage": ""
+                },
+                "14": {
+                    "id": "14",
+                    "name": "Family",
+                    "disabledForwardingIds": {},
+                    "isCustomForwarding": false,
+                    "isCustomGreeting": false,
+                    "isCustomDirectConnect": false,
+                    "directConnect": false,
+                    "greetingId": 0,
+                    "isCircle": false,
+                    "isCustomTranscriptionLanguage": false,
+                    "transcriptionLanguage": ""
+                },
+                "15": {
+                    "id": "15",
+                    "name": "Coworkers",
+                    "disabledForwardingIds": {},
+                    "isCustomForwarding": false,
+                    "isCustomGreeting": false,
+                    "isCustomDirectConnect": false,
+                    "directConnect": false,
+                    "greetingId": 0,
+                    "isCircle": false,
+                    "isCustomTranscriptionLanguage": false,
+                    "transcriptionLanguage": ""
+                }
+            },
+            "groupList": [
+                "all_contacts",
+                "all_contacts",
+                "13",
+                "14",
+                "15"
+            ],
+            "specialGroups": {
+                "all_contacts": {
+                    "directConnect": false,
+                    "greetingId": 0,
+                    "isCustomForwarding": false,
+                    "isCustomGreeting": false,
+                    "isCustomDirectConnect": false,
+                    "disabledForwardingIds": {},
+                    "isCustomTranscriptionLanguage": false,
+                    "transcriptionLanguage": "",
+                    "id": "all_contacts",
+                    "name": "All Contacts"
+                },
+                "blocked_callers": {
+                    "directConnect": false,
+                    "greetingId": 0,
+                    "isCustomForwarding": false,
+                    "isCustomGreeting": false,
+                    "isCustomDirectConnect": false,
+                    "disabledForwardingIds": {},
+                    "isCustomTranscriptionLanguage": false,
+                    "transcriptionLanguage": "",
+                    "id": "blocked_callers",
+                    "name": "Anonymous Callers"
+                }
+            },
+            "lowBalanceNotificationEnabled": false,
+            "emailAddresses": [
+                "synergv@webos.org"
+            ],
+            "baseUrl": "https://www.google.com/voice"
+        }
+    }
+}

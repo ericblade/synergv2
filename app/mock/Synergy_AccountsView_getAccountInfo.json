@@ -1,0 +1,70 @@
+{ "returnValue": true,
+	"result":
+	{ "_kind": "com.palm.account:1",
+        "_id": "++I36yugp0ZqnQAP",
+        "_rev": 258,
+        "_sync": true,
+        "beingDeleted": false,
+        "capabilityProviders":
+		[
+            {
+                "_id": "2+32",
+                "capability": "CONTACTS",
+                "id": "com.palm.palmprofile.contacts",
+                "db_kinds": {
+                    "contact": "com.palm.contact.palmprofile:1"
+                }
+            },
+            {
+                "_id": "2+33",
+                "capability": "CALENDAR",
+                "id": "com.palm.palmprofile.calendar"
+            },
+            {
+                "_id": "2+34",
+                "capability": "TASKS",
+                "id": "com.palm.palmprofile.tasks"
+            },
+            {
+                "_id": "2+35",
+                "capability": "MEMOS",
+                "id": "com.palm.palmprofile.memos"
+            },
+            { "id":"com.ericblade.synergv.account.im",
+                                  "alwaysOn": false,
+                                  "sync": "palm://com.ericblade.synergv.service/sync",
+                                  "loc_name": "SynerGV SMS",
+                                  "loc_shortName": "GoogleVoice",
+                                  "capability":"MESSAGING",
+                                  "capabilitySubtype": "IM",
+                                  "serviceName":"type_synergv",
+                                  "supportsInvisibleStatus": false,
+                                  "implementation": "palm://com.ericblade.synergv.service/",
+								  "onCreate": "palm://com.ericblade.synergv.service/onCreate",
+                                  "onEnabled": "palm://com.ericblade.synergv.service/onEnabled",
+								  "onDelete": "palm://com.ericblade.synergv.service/onDelete",
+                                  "onCredentialsChanged": "palm://com.ericblade.synergv.service/onCredentialsChanged",
+                                  "onCapabilitiesChanged": "palm://com.ericblade.synergv.service/onCapabilitiesChanged",
+                                  "loginStateChanged": "palm://com.ericblade.synergv.service/loginStateChanged",
+                                  "sendIM": "palm://com.ericblade.synergv.service/sendIM",
+                                  "sendCommand": "palm://com.ericblade.synergv.service/sendCommand",
+                                  "chatWithNonBuddies": true,
+                                  "readOnlyData": false,
+                                  "icon": { "loc_32x32": "images/gvoice32.png", "loc_48x48": "images/gvoice48.png", "splitter": "images/gvoice32.png" },
+                                  "dbkinds": {
+                                    "immessage": "com.ericblade.synergv.immessage:1",
+                                    "imloginstate": "com.ericblade.synergv.loginstate:1",
+                                    "imcommand": "com.ericblade.synergv.imcommand:1",
+									"configuration": "com.ericblade.synergv.configuration:1"
+                                  }
+			}
+        ],
+        "templateId": "com.ericblade.synergv.account",
+        "username": "blade.eric",
+        "loc_name": "SynerGV Account",
+        "icon": {
+            "loc_32x32": "\/usr\/palm\/public\/accounts\/com.palm.palmprofile\/images\/mypalm-32x32.png",
+            "loc_48x48": "\/usr\/palm\/public\/accounts\/com.palm.palmprofile\/images\/mypalm-48x48.png"
+        }
+    }
+}
