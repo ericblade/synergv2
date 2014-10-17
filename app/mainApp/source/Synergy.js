@@ -1,6 +1,7 @@
+// settings.settings.smsNotifications contains an array of { address: '+phone number', active: false } that describe the current sms forwarding status for each phone
 // TODO: Changing the sync time needs to re-set the alarm time immediately for all accounts
 // TODO: ***** DELETE PERMANENTLY CONFIRM DIALOG *****
-// TODO: button to add as contacts, load contacts into memory at app start, etc
+// TODO: load contacts into memory at app start, etc
 // TODO: add a button to Email Notifications menu that will open the Voice email configuration page
 // TODO: isSpam determines block status -- if they can be blocked (ie they aren't one of your forwarding numbers), they'll be marked Spam and blocked.
 // 		removing Spam attribute removes block -- INVESTIGATE IF THIS IS TRUE. Block sends to Spam, but does Spam auto block??
@@ -60,8 +61,9 @@ enyo.kind({
 			and launch to the call view, right from Just Type!<p> \
 			Load up the Contacts app and make sure that all your Google Voice contacts are associated to the correct people -- sometimes \
 			Contact Merging isn't as bright as we'd like it to be.<p>\
+			Do some of your contacts have numbers instead of names?  Go to the Google Contacts site, and make sure that those contacts have actual names entered - Google Voice doesn't transmit names for contacts that only have Nicknames or Company Names.<p>\
 			Want your messages faster? Grab the (unofficial) webOS Boxcar app from the App Catalog, open up the App Menu here, and select 'Boxcar Notifications'. \
-			Nearly instantaneous push notifications from Boxcar.io!<p>\
+			Nearly instantaneous push notifications from Boxcar.io! (this app is not yet available for public - this message will be removed if it's not available at release)<p>\
 			Want to send a message to one of your Google Voice contacts? You should be able to \
 			locate them in Just Type or the webOS Contacts app, then click on the 'IM' box next to their \
 			Google Voice contact number (not their main phone number)<p>\
@@ -78,6 +80,7 @@ enyo.kind({
 					[
 						{ kind: "ToolButtonGroup", components:
 							[
+								{ name: "AddContactButton", caption: "Add Contact", onclick: "openContactPopup" },
 								{ name: "MapButton", caption: "Map Location", onclick: "launchMap", },
 								{ name: "MarkReadButton", caption: "Mark Read", onclick: "toggleRead", },
 								{ name: "ArchiveButton", caption: "Archive", onclick: "toggleArchive" },
@@ -98,7 +101,34 @@ enyo.kind({
 				}
 			]
 		},
+		{ name: "ContactPopup", caption: "Edit Contact", lazy: false, kind: "Popup", components:
+			[
+				{ name: "ContactName", kind: "Input", hint: "Contact Name" },
+				{ name: "ContactNumber", kind: "Input", hint: "Contact Number" },
+				{ name: "ContactPhoneType", kind: "synergv.ListSelector", value: "Mobile", onChange: "phoneSelect", items: [ "Home", "Mobile", "Work"] },
+				{ kind: "Button", caption: "Add Contact", onclick: "addContact", className: "enyo-affirmative" },
+			]
+		},
 	],
+	openContactPopup: function(inSender, inEvent) {
+		this.$.ContactPopup.open();
+		this.$.ContactName.setValue(this.message.fromName);
+		this.$.ContactNumber.setValue(this.message.phoneNumber);
+		this.$.ContactPhoneType.setValue("Mobile");
+	},
+	closeContactPopup: function(inSender, inEvent) {
+		this.$.ContactPopup.close();
+	},
+	addContact: function(inSender, inEvent) {
+		var name = this.$.ContactName.getValue();
+		var num = this.$.ContactNumber.getValue();
+		var phone = this.$.ContactPhoneType.getValue().toUpperCase();
+		
+		if(name && num && phone) {
+			this.closeContactPopup();
+			this.$.gvapi.call({ accountId: enyo.application.accountId, phoneNumber: num, phoneType: phone, name: name }, { method: "setContactInfo" });			
+		}
+	},
 	launchMap: function(inSender, inEvent) {
 		this.$.MenuToaster.close();
 		this.doMap(this.message.location);
@@ -183,6 +213,18 @@ enyo.kind({
 		var msg = "";
 		enyo.application.adjustAccessCount(-1);
 		enyo.application.selectedIds = [ ];
+		this.log("method=", inRequest.method);
+		this.log("inResponse=", inRequest.response);
+		if(inRequest.method == "setContactInfo") {
+			var data = inResponse.response.data;
+			if(data.matchingContacts && data.matchingContacts.length > 0 && data.matchContacts.name != inRequest.params.name)
+			{
+				var params = inRequest.params;
+				params.focusId = data.matchingContacts[0].focusId;
+				this.$.gvapi.call(params, { method: "setContactInfo" });			
+			}
+			return;
+		}
 		switch(inRequest.params.flag) {
 			case "saveNote": msg = "Note saved"; this.message.note = inRequest.params.note; this.doRedrawIndex(); break;
 			case "deleteNote": msg = "Note deleted"; this.message.note = ""; this.doRedrawIndex(); break;
@@ -238,6 +280,8 @@ enyo.kind({
 				msg = inRequest.params.flag + " failed";
 				break;
 		}
+		if(inRequest.method == "setContactInfo")
+			msg = "Set Contact failed";
 		enyo.windows.addBannerMessage(msg, '{}', "images/google-voice-icon24.png");
 	},
 	toggleToaster: function(inSender, inEvent) {
@@ -721,6 +765,7 @@ enyo.kind({
 		this.$.RightPane.selectViewByName("TelephoneView");
 		if(inPhoneNumber)
 		    this.$.TelephoneView.setPhoneNumber(inPhoneNumber);
+		this.$.TelephoneView.render();
 		return true;
 	},
 	composeMessage: function(inSender, inRecp) {
@@ -881,6 +926,7 @@ enyo.kind({
 
 	components: [
 		{kind: "ApplicationEvents", /*onApplicationRelaunch: "applicationRelaunchHandler",*/ onWindowParamsChange: "applicationRelaunchHandler" },
+		{ name: "PhoneHome", kind: "WebService", url: "http://www.ericbla.de/synergv/prerelease.php" },
         { name: "mainSpinner", kind: "SpinnerLarge", style: "position: absolute; top: 45%; left: 45%; z-index: 10;", showing: false },
 		{ name: "getAuthKey", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "fetchAuthKey", onSuccess: "authKeyReceived", onFailure: "authKeyFailed" },
 		{ name: "CreateVoicemailDir", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "createVoicemailDir" },
@@ -908,6 +954,8 @@ enyo.kind({
 				{ name: "DNDMenu", kind: "MenuCheckItem", caption: "Do Not Disturb", onclick: "toggleSetting", settingName: "doNotDisturb" },
 				{ name: "TranscriptsMenu", kind: "MenuCheckItem", caption: "Voicemail Transcripts", onclick: "toggleSetting", settingName: "showTranscripts" },
 				{ name: "MissedCallsInboxMenu", kind: "MenuCheckItem", caption: "Missed Calls To Inbox", onclick: "toggleSetting", settingName: "missedToInbox" },
+				{ name: "EditContactsMenu", caption: "Edit Google Contacts", onclick: "GoogleContacts" },
+				{ name: "EditGroupsMenu", caption: "Edit Google Groups/Circles", onclick: "GoogleGroups" },
 				/*{ caption: "Email Notifications", defaultKind: "MenuCheckItem", components:
 					[
 						{ name: "EmailNotificationsMenu", caption: "Voicemail", onclick: "toggleSetting", settingName: "emailNotificationActive" },
@@ -925,10 +973,37 @@ enyo.kind({
 				{ name: "AccountsView", kind: "AccountsView",
 					onSelectedAccount: "accountSelected" },
 				{ name: "MainView", kind: "MainView", onSettingsReceived: "settingsReceived", onSetPages: "setPages" },
-				{ name: "BoxCarView", kind: "BoxCarView", onBack: "goBack", },
+				{ name: "BoxCarView", kind: "BoxCarView", onBack: "goBack", className: "box-center", },
 			]
 		},
+		{ name: "BrowserPopup", kind: "ModalDialog", style: "position: fixed; top: 3%; left: 3%; width: 94%; height: 94%;", components:
+			[
+				{ kind: "PageHeader", components:
+					[
+						{ content: "Click " },
+						{ kind: "Button", caption: "Close Browser", onclick: "closeBrowser", },
+						{ content: "to return to SynerGV" },
+					]
+				},
+				{ content: "If the Purchase page does not open immediately, close this window and click the credit button again.", className: "enyo-item-ternary" },
+				{ name: "Browser", style: "height: 580px; width: 100%;", kind: "WebView", url: "https://voice.google.com/" },
+			]
+		},		
 	],
+	GoogleGroups: function() {
+		this.openBrowser();
+		this.$.Browser.setUrl("https://www.google.com/voice#groups");
+	},
+	GoogleContacts: function() {
+		this.openBrowser();
+		this.$.Browser.setUrl("https://www.google.com/voice#contacts");
+	},
+	openBrowser: function(inSender, inEvent) {
+		this.$.BrowserPopup.open();
+	},
+	closeBrowser: function(inSender, inEvent) {
+		this.$.BrowserPopup.close();
+	},
 	setPages: function(inSender, i) {
 		this.log("setting pages", i);
         this.$.pagePicker.setMax(i);
@@ -985,6 +1060,11 @@ enyo.kind({
 				this.$.mainSpinner.hide();
 			}
 		});
+		var params = enyo.fetchDeviceInfo() || {};
+		params.release = "Hadak";
+		var appInfo = enyo.fetchAppInfo();
+		params.v = appInfo ? appInfo.version : "chrome";
+		this.$.PhoneHome.call(params);
 	},
 	applicationRelaunchHandler: function(inSender) {
 		this.log(enyo.windowParams);
@@ -1068,7 +1148,8 @@ enyo.kind({
 		enyo.application.settings = enyo.application.phones = undefined;
 		
 		enyo.application.accountId = inAccountInfo.accountId;
-		enyo.application.adjustAccessCount(1);
+		if(enyo.application.adjustAccessCount)
+			enyo.application.adjustAccessCount(1);
 		
 		this.$.getAuthKey.call({ accountId: enyo.application.accountId });
 		this.selectMainView();
@@ -1175,35 +1256,44 @@ enyo.kind({
 		"onBack": "",
 	},
 	components: [
-		{ kind: "Scroller", flex: 1, components:
+		{ name: "Prefs", kind: "enyo.PreferencesService", onFetchPreferences: "receivedPrefs" },
+		{ kind: "FadeScroller", flex: 1, accelerated: true, components:
 			[
 				{ name: "launcher", kind: "PalmService", service: "palm://com.palm.applicationManager", method: "open", },
 				{ kind: "RowGroup", caption: "Step 1: Sign up for and Configure Boxcar.io", components:
 					[
-						{ allowHtml: true, content: 'You can now integrate SynerGV with Boxcar.io for notifications!<P>\
-							A (unofficial) webOS Boxcar notifications app is in the works, and will hopefully be available soon!<P>\
-							Click the Signup at Boxcar.io button to sign up and configure Boxcar to send you notifications automatically, \
-							and they will send an email to you containing a new email address to forward your Google Voice notifications to. \
-							Click the Configure Google Voice button, then click "Add a new email address", and ensure that Google Voice is set to \
-							forward your text messages and voicemail alerts to that new @push.boxcar.io address.<P>\
-							Anytime you have the Boxcar webOS dashboard open, it will automatically sync SynerGV to your Google Voice account the moment messages are received!<P>'
-						},
+						{ allowHtml: true, className: "enyo-item-secondary", content: '\
+						You can use the Boxcar.io push notification service to automatically sync SynerGV to the Messaging app nearly instantly upon receiving a message!<P>\
+						Note: Due to a bug with persistent sockets in webOS 3.0.5, if you close the SynerGV app before a connection to Boxcar.io is completed, or in certain other \
+						rare circumstances, webOS Luna may restart periodically, closing any open apps. In testing, this problem was exceptionally rare and not easily reproducible outside \
+						of closing the app before the connection was complete. If you find a way to easily reproduce this otherwise, PLEASE let me know using the email in the About menu.<P>\
+						We anticipate that this problem will be fixed in a future update to webOS.<P>\
+						When push notification connection is successful, a Dashboard notification \
+						will open, letting you know that SynerGV is receiving push notifications from the Boxcar.io service.<P>\
+						I recommend you set your normal sync timer to between 5 and 10 minutes when using this feature, in case messages are missed at the Boxcar side.<P>' },
 						{ kind: "Button", caption: "Signup at Boxcar.io", onclick: "openBoxcar" },
 					]
 				},
-				{ kind: "RowGroup", caption: "Step 2: Configure Google Voice", components:
+				{ kind: "RowGroup", caption: "Step 2: Enter your Boxcar login info", components:
+					[
+						{ className: "enyo-item-secondary", content: "To disable Boxcar in SynerGV, set the username to blank." },
+						{ name: "BoxcarUsername", kind: "Input", inputType: "email", hint: "Enter Boxcar.io Username Here", label: "Username", onchange: "usernameChanged" },
+						{ name: "BoxcarPassword", kind: "PasswordInput", hint: "Enter Boxcar.io Password Here", label: "Password", onchange: "passwordChanged" },
+					],
+				},
+				{ kind: "RowGroup", caption: "Step 3: Configure Google Voice", components:
 					[
 						{ content: "If the Configure Google Voice button does not take you automatically to the Configure Voicemail and Text page, select the 'Settings Gear', then press 'Settings', then 'Voicemail & Text'."},
 						{ kind: "Button", caption: "Configure Google Voice", onclick: "openGVoice" },
 					]
 				},
-				{ kind: "RowGroup", caption: "Step 3: Verify the forwarding setup", components:
+				{ kind: "RowGroup", caption: "Step 4: Verify the forwarding setup", components:
 					[
 						{ content: "After configuring Google Voice with the new email address, click this button to return to your Boxcar inbox, select Google Voice, and then tap on the link after 'Please touch 'View Original' on this message, or follow this link'."},
 						{ kind: "Button", caption: "Boxcar.io Inbox", onclick: "openBoxcarInbox" },
 					]
 				},
-				{ kind: "RowGroup", caption: "Step 4: Enjoy nearly instant sync times", components:
+				{ kind: "RowGroup", caption: "Step 5: Enjoy nearly instant sync times", components:
 					[
 						{ kind: "Button", caption: "Back", onclick: "doBack" },
 					]
@@ -1211,12 +1301,28 @@ enyo.kind({
 			]
 		},
 	],
+	usernameChanged: function(inSender, inEvent) {
+		this.log();
+		this.$.Prefs.updatePreferences({ synergvBoxcarUsername: this.$.BoxcarUsername.getValue() });
+	},
+	passwordChanged: function(inSender, inEvent) {
+		this.log();
+		this.$.Prefs.updatePreferences({ synergvBoxcarPassword: this.$.BoxcarPassword.getValue() });
+	},
 	openBoxcar: function(inSender, inEvent) {
 		this.$.launcher.call({ target: "http://boxcar.io/services/google_voice_accounts/new?provider_id=316" });
 		return true;
 	},
 	openGVoice: function(inSender, inEvent) {
 		this.$.launcher.call({ target: "https://www.google.com/voice#voicemailsettings" });
+	},
+	rendered: function() {
+		this.inherited(arguments);
+		this.$.Prefs.fetchPreferences(["synergvBoxcarUsername", "synergvBoxcarPassword" ]);
+	},
+	receivedPrefs: function(inPrefs) {
+		if(inPrefs.synergvBoxcarUsername !== undefined) this.$.BoxcarUsername.setValue(inPrefs.synergvBoxcarUsername);
+		if(inPrefs.synergvBoxcarPassword !== undefined) this.$.BoxcarPassword.setValue(inPrefs.synergvBoxcarPassword);
 	}
 });
 
@@ -1251,3 +1357,9 @@ enyo.kind({
 // I can have Missed Calls or Text Messages, but not both, and the Voicemail isn't working at all
 // TODO: when clicking on a voicemail as the first message loaded, it may not appear formatted properly? wth
 // TODO: Commands sent to an account other than the one currently in use would be ignored. Should add the ability to specify an accountId to the accounts view, have it locate the account, and then select it, which would then trigger the commands to run.
+// TODO: add a button to send any of a number of preconfigured responses to messages
+// TODO: we need to make the timer call in the service run on activityManager and not alarm, so it's only called when there's internet
+
+// make use of  @media only screen and (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) .. that's for iOS, find the parameters for Pre 3s.. ?
+
+// TODO: patch the "Block Sender" and "Delete Conversation" buttons in Messaging to send the commands to google too

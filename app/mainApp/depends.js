@@ -2,6 +2,7 @@ enyo.depends(
     "$enyo-lib/accounts/",
     "source/firmin.js",
     "source/EnyoOverrides.js",
+    "source/PreferencesService.js",
     "source/Popups.js",
     "source/AccountsView.js",
     "source/VoicemailView.js",

@@ -1,5 +1,5 @@
-var ServiceResponseLogging = true;
-
+// TODO: should we run sync before sending an IM?
+// TODO: we should probably only run one sync if there's a bunch of IMs sent in a short time period.. or do we already.. ?
 // TODO: it might be possible that just replacing the https event emitter with something that looks vaguely like it in
 //		node_modules/googleclientlogin/index.js might get us running on webOS 2. . . 
 // TODO: why does getSettings sometimes take .. damn near forever .. to return?
@@ -60,8 +60,6 @@ try {
 
 // TODO: we need to disable/cancel our Activity at onEnable with enabled: false
 
-console.log("Loading serviceEndPoints *****************************************************");
-
 getVoiceMessages = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
@@ -89,7 +87,6 @@ checkCredentials = Class.create({
 		
 		var GVclient = new GV.Client({ email: args.username, password: args.password });
 		future.now(function() {
-			console.log("getting gvoice rnrse/authcode");
 			GVclient.getRNRSE(function(error, response) {
 				if(error) {
 					// error.code = 10 message=GOOGLE_CLIENTLOGIN_ERROR - incorrect userid/password
@@ -108,7 +105,6 @@ checkCredentials = Class.create({
 						errorText: error.message
 					};
 				} else {
-					console.log("RNRSE received");
 					future.result = {
 						returnValue: true, 
 						credentials:
@@ -131,7 +127,6 @@ checkCredentials = Class.create({
 				}
 			});
 		}).then(function(fut) {
-			console.log("then fut=", JSON.stringify(fut.result));
 			future.result = fut.result;
 			future.result.returnValue = false;
 		});
@@ -154,8 +149,6 @@ getAccounts = Class.create({
 			for(var x = 0; x < dbResults.length; x++) {
 				ret.push(dbResults[x].accountId);
 			}
-			if(ServiceResponseLogging)
-				console.log(" results=" + JSON.stringify(ret));
 			
 			future.result = { returnValue: true, accounts: ret };
 		}));
@@ -165,7 +158,6 @@ getAccounts = Class.create({
 onCreate = Class.create({
 	run: function(future) {
 		var args = this.controller.args;
-		console.log("onCreate args=", JSON.stringify(args));
 
 		// Setup permissions on the database objects so that our app can read/write them.
 		// This is purely optional, and according to the docs here:
@@ -207,10 +199,8 @@ onCreate = Class.create({
 
 		PalmCall.call("palm://com.palm.db/", "putPermissions", { permissions: permissions } ).then(function(fut)
 		{
-			console.log("permissions put result=", JSON.stringify(fut.result));
 			fut.result = { returnValue: true, permissionsresult:fut.result };
 		}).then(function(fut2) {
-			console.log("storing account keys");
 			var keystore1 = { "keyname":"GVUsername:"+args.accountId, "keydata": Base64.encode(args.config.username), "type": "AES", "nohide":true};
 			var keystore2 = { "keyname":"GVPassword:"+args.accountId, "keydata": Base64.encode(args.config.password), "type": "AES", "nohide":true};
 			var keystore3 = { "keyname":"GVAuth:"+args.accountId, "keydata": Base64.encode(args.config.auth), "type": "AES", "nohide":true };
@@ -221,12 +211,10 @@ onCreate = Class.create({
 			PalmCall.call("palm://com.palm.keymanager/", "store", keystore4);
 			PalmCall.call("palm://com.palm.keymanager/", "store", keystore1).then( function(f) 
 			{
-				console.log("keymanager username store result=", JSON.stringify(f.result));
 				if (f.result.returnValue === true)
 				{
 					PalmCall.call("palm://com.palm.keymanager/", "store", keystore2).then( function(f2) 
 				   {
-					  console.log("keymanager password store result=", JSON.stringify(f2.result));
 					  future.result = f2.result;
 				   });
 				}
@@ -314,7 +302,6 @@ var sendIM = Class.create({
 		console.log("sendIM", JSON.stringify(args));
 		
 		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
-			console.log("sending with client ", JSON.stringify(f.result.client));
 			var client = f.result.client;
 			client.connect('sms', {
 				outgoingNumber: args.to,
@@ -427,7 +414,6 @@ onEnabled = Class.create({
 		} else if(args.enabled === true) {
 			future.nest(PalmCall.call("palm://com.palm.service.accounts/", "getAccountInfo", { accountId: args.accountId }).then(function(f) {
 				var accountInfo = f.result.result;
-				console.log("***** getAccountInfo returned", JSON.stringify(accountInfo));
 				var serviceName = "";
 				for(var x = 0; x < accountInfo.capabilityProviders.length; x++) {
 					if(accountInfo.capabilityProviders[x].capability == "MESSAGING") {
@@ -588,10 +574,8 @@ var storeConversation = Class.create({
 		var msgTexts = [];
 		var msgsToStore = [];
 		var msgsToMerge = [];
-		//console.log("storeConversation", JSON.stringify(args));
 
 		args.storeOwn = args.storeOwn || assistant.syncOutgoing;
-		//console.log("syncOutgoing=" + args.storeOwn);
 		
 		if(msg.labels.indexOf("voicemail") !== -1) {
 			msg.messageText = "Voicemail Transcription: (" + msg.duration + " seconds) " + msg.messageText + " --- To listen: http://synergv/playVoicemail/" + args.accountId + "/" + msg.id;
@@ -603,10 +587,17 @@ var storeConversation = Class.create({
 			msg.messageText = "Received Call";
 			msgTexts.push(msg.messageText);
 		} else if(msg.labels.indexOf("placed") !== -1) {
+			console.log("syncPlacedCalls=" + assistant.syncPlacedCalls);
+			if(assistant.syncPlacedCalls !== true)
+			{
+				future.result = { returnValue: true, status: "Not storing placed call." };
+				return future;
+			}
 			msg.messageText = "Placed Call";
 			msgTexts.push(msg.messageText);
 		} else if(msg.thread) {
 			msg.thread.forEach(function(sms, index) {
+				sms.text += " -- " + sms.time;
 				msgTexts.push(sms.text);
 			});
 		} else {
@@ -617,11 +608,10 @@ var storeConversation = Class.create({
 			select: [ "messageText" ],
 			where: [
 				{ prop: "gConversationId", op: "=", val: msg.id },
-				{ prop: "messageText", op: "=", val: msgTexts }
+				{ prop: "messageText", op: "=", val: msgTexts },
 			]
 		};
 		future.nest(DB.find(dbquery, false, false).then(function(f) {
-			console.log("db future: ", JSON.stringify(f.result));
 			var dbResults = f.result.results;
 			PalmCall.call("palm://com.palm.service.accounts/", "getAccountInfo",
 						  { accountId: args.accountId }).
@@ -629,14 +619,10 @@ var storeConversation = Class.create({
 				var username = accountFuture.result.result.username;
 				console.log("storeConversation for account", username);
 				
-				//console.log("********* Comparison db results", JSON.stringify(dbquery), "-----", JSON.stringify(f.result));
-				console.log("dbResults=", JSON.stringify(dbResults));
-				console.log("dbquery=", JSON.stringify(dbquery));
 				if(msg.thread) {
 					msg.thread.forEach(function(sms, index) {
 						var bFound = false;
 						for(var x = 0; x < dbResults.length; x++) {
-							//console.log("comparing", dbResults[x].messageText, "-and-", sms.text);
 							if(dbResults[x].messageText == sms.text)
 							{
 								bFound = true;
@@ -659,9 +645,8 @@ var storeConversation = Class.create({
 								to: [ { addr: sms.from == "Me:" ? msg.phoneNumber : username } ],
 								serviceName: "type_synergv",
 								username: username,
-								gConversationId: msg.id
+								gConversationId: msg.id,
 							};
-							console.log("message phoneNumber: " + msg.phoneNumber);
 							if(sms.from == "Me:" && args.storeOwn == false)
 								msgsToMerge.push(dbMsg);
 							else
@@ -670,9 +655,7 @@ var storeConversation = Class.create({
 					});
 				} else {
 					var bFound = false;
-					//console.log("message id=", msg.id, "messageText=", msg.messageText);
 					for(var x = 0; x < dbResults.length; x++) {
-						//console.log("comparing", dbResults[x].messageText, "-and-", msg.messageText);
 						if(dbResults[x].messageText == msg.messageText)
 						{
 							bFound = true;
@@ -695,7 +678,6 @@ var storeConversation = Class.create({
 							username: username,
 							gConversationId: msg.id
 						};
-						//console.log("storing message query:", JSON.stringify(dbMsg));
 						msgsToStore.push(dbMsg);
 					}
 				}
@@ -703,7 +685,6 @@ var storeConversation = Class.create({
 			});
 		})).then(function(fut) {
 			DB.put(msgsToStore).then(function(wtf) {
-				console.log("stored", JSON.stringify(fut.result));
 				wtf.result = { returnValue: true };
 				fut.result = { returnValue: true };
 				future.result = { returnValue: true };
@@ -727,7 +708,6 @@ var sync = Class.create({
 		var GVclient;
 		
 		args.markMessagesRead = args.markMessagesRead || assistant.markReadOnSync;
-		//console.log("markMessagesRead=" + args.markMessagesRead);
 		
 		console.log("sync run start", JSON.stringify(args));
 		if(args.accountId === undefined) {
@@ -779,11 +759,11 @@ var sync = Class.create({
 			key: "SynerGVsync:" + args.accountId,
 			//"in": "00:05:00",
 			//"in": "00:02:30",
-			"in": assistant.syncTime ? secondsToTime(assistant.syncTime) : "00:05:00",
+			"in": !isNaN(assistant.syncTime) ? secondsToTime(assistant.syncTime) : "00:02:00",
 			uri: "palm://com.ericblade.synergv.service/sync",
 			params: { accountId: args.accountId }
 		}).then(function(f) {
-			console.log("alarm set result (" + assistant.syncTime ? secondsToTime(assistant.syncTime) : "00:05:00" + "):", JSON.stringify(f.result));
+			console.log("alarm set result (" + !isNaN(assistant.syncTime) ? secondsToTime(assistant.syncTime) : "00:02:00" + "):", JSON.stringify(f.result));
 		}));
 		var dbResults;
 		syncFuture.nest(DB.find(query, false, false).then(function(f) {
@@ -799,7 +779,7 @@ var sync = Class.create({
 		}).
 			then(function(f) {
 			var results = dbResults;
-			console.log("pending message search result=", JSON.stringify(results));
+			//console.log("pending message search result=", JSON.stringify(results));
 			if(results.length == 0) {
 				f.result = { returnValue: true };
 			}
@@ -809,7 +789,7 @@ var sync = Class.create({
 					console.log("new lastRev=", assistant.lastRev);
 					assistant.lastRev = results[x]["_rev"];
 				}
-				console.log("outgoing msg from", results[x].from.addr, "comparing to", username);
+				//console.log("outgoing msg from", results[x].from.addr, "comparing to", username);
 				if(results[x].from.addr !== username)
 				{
 					continue;
@@ -850,9 +830,9 @@ var sync = Class.create({
 				//mergeIds.push( { "_id": results[x]["_id"], "status": "successful" });
 			}
 			f.then(function(fut) {
-				console.log("********** all messages to mark successful: ", JSON.stringify(fut.result.mergeIds));
+				//console.log("********** all messages to mark successful: ", JSON.stringify(fut.result.mergeIds));
 				fut.nest(DB.merge(mergeIds).then(function(mergeFut) {
-					console.log("merge status", JSON.stringify(mergeFut.result));
+					//console.log("merge status", JSON.stringify(mergeFut.result));
 					mergeFut.result = { returnValue: true };
 				}));
 			});
@@ -882,9 +862,7 @@ var sync = Class.create({
 			// TODO: check if there actually are any messages to mark before sending the mark read
 			console.log("****** END OF SYNCFUTURE!!!!!!! Marking read:", JSON.stringify(conversationIds));
 			if(args.markMessagesRead && conversationIds.length > 0) {
-				GVclient.set('read', { id: conversationIds }, function() {
-					console.log("Messages marked read.");
-				});
+				PalmCall.call("palm://com.ericblade.synergv.service/", "setMessageFlag", { accountId: args.accountId, flag: "read", id: conversationIds });				
 			}
 			syncFuture.result = { returnValue: true };
 		});
@@ -892,8 +870,8 @@ var sync = Class.create({
 	complete: function() {
 		var args = this.controller.args;
 		var activity = args.$activity;
-		console.log("sync complete starting", JSON.stringify(args));
-		console.log("activity received was", JSON.stringify(activity));
+		//console.log("sync complete starting", JSON.stringify(args));
+		//console.log("activity received was", JSON.stringify(activity));
 		if(args.accountId === undefined) return;
 		if(activity === undefined) return;
 		var newact = {
@@ -925,7 +903,7 @@ var sync = Class.create({
 			newact.trigger.params.query.where.push({ "prop": "_rev", "op":">", "val": this.controller.service.assistant.lastRev });
 		}
 		PalmCall.call("palm://com.palm.activitymanager/", "complete",  newact).then(function(f) {
-			console.log("sync complete completed", JSON.stringify(f.result));
+			//console.log("sync complete completed", JSON.stringify(f.result));
 			f.result = { returnValue: true };
 		})
 	}	
@@ -1031,10 +1009,10 @@ var syncContacts = Class.create({
 		var args = this.controller.args;
 		var dbContacts = [];
 
-		console.log("sync contacts begin");		
+		console.log("sync contacts begin " + args.accountId);		
 		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
 			var GVclient = f.result.client;
-			assistant.GVclient.getContacts(function(error, contacts) {
+			GVclient.getContacts(function(error, contacts) {
 				if(error) {
 					// error.code = 10 message=GOOGLE_CLIENTLOGIN_ERROR - incorrect userid/password
 					// error.code = 11 message=REQUEST_ERROR - wifi off					
@@ -1117,6 +1095,32 @@ var syncContacts = Class.create({
 				}
 			});
 		}));
+		
+		// TODO: contact sync to server -- this method doesn't give us ability to sync all the phone numbers, as far as i know, so
+		// we could end up really pissing people off by mucking with their contacts data making everyone's numbers mobile.
+		
+		/*var dbq = {
+			from: "com.ericblade.synergv.contact:1",
+		};
+		
+		future.nest(DB.find(dbq, false, false).then(function(f) {
+			var dbr = f.result.results;
+			for(var x = 0; x < dbr.length; x++) {
+				var params = {
+					accountId: args.accountId,
+					phoneNumber: dbr[x].ims[0].phoneNumber,
+					name: dbr[x].nickname,
+					phoneType: "MOBILE",
+				};
+				if(dbr[x].remoteId) {
+					params.focusId = dbr[x].remoteId;
+				}
+				PalmCall.call("palm://com.ericblade.synergv.service/", "setContactInfo", params);
+			}
+			future.result = { returnValue: true };
+			console.log("sent " + x + " contacts");
+		}));*/
+		return future;
 	}
 });
 
@@ -1395,6 +1399,8 @@ var editGeneralSettings = Class.create({
 				}
 			});
 		}));
+		
+		return future;
 	},
 });
 
@@ -1443,5 +1449,66 @@ var setMessageFlag = Class.create({
 				}			
 			});
 		}));
+		
+		return future;
+	}
+});
+
+var getBillingCredit = Class.create({
+	run: function(future) {
+		var args = this.controller.args;
+		var assistant = this.controller.service.assistant;
+		console.log("getBillingCredit", JSON.stringify(args));
+		
+		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
+			console.log("sending with client ", JSON.stringify(f.result.client));
+			var client = f.result.client;
+			client.connect('getBillingCredit', args.options, function(error, response, body) {
+				var data = JSON.parse(body);
+				var errormsg = "";
+				if(error || !data.ok) {
+					console.log("Error: ", error);
+					console.log("body: ", body);
+					console.log("data.ok: ", data.ok);
+					console.log("data.code: ", data.data.code);
+					future.result = { errorcode: data.data.code, errormsg: errormsg,
+										returnValue: false };
+				} else {
+					console.log("Billing Credit received " + JSON.stringify(response.body));
+					future.result = { returnValue: true, credit: JSON.parse(response.body) };
+				}
+			});
+		}));
+		
+		return future;
+	},
+});
+
+var setContactInfo = Class.create({
+	run: function(future) {
+		var args = this.controller.args;
+		var assistant = this.controller.service.assistant;
+		console.log("setContactInfo", JSON.stringify(args));
+		
+		future.nest(assistant.getGVClientForAccount(args.accountId).then(function(f) {
+			console.log("sending with client ", JSON.stringify(f.result.client));
+			var client = f.result.client;
+			var options = {
+				phoneNumber: args.phoneNumber,
+				phoneType: args.phoneType,
+				name: args.name,
+				needsCheck: 1
+			};
+			if(args.focusId) {
+				options.focusId = args.focusId;
+				options.syntheticId = "";
+			}
+			client.connect('setContact', options, function(error, response, body) {
+				PalmCall.call("palm://com.ericblade.synergv.service/", "syncContacts", { accountId: args.accountId });
+				future.result = { returnValue: true, response: JSON.parse(response.body) };
+			});
+		}));
+		
+		return future;
 	}
 })

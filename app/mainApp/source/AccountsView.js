@@ -36,6 +36,10 @@ enyo.kind({
 				inResponse.synergvSyncTime = 5;
 				this.$.Preferences.call({ synergvSyncTime: 5 }, { method: "setPreferences" });
 			}
+			if(inResponse.synergvSyncPlacedCalls === undefined) {
+				inResponse.synergvSyncPlacedCalls = true;
+				this.$.Preferences.call({ synergvSyncPlacedCalls: true }, { method: "setPreferences" });
+			}
 			if(inResponse.synergvSyncOutgoing !== undefined)
 				this.$.OutgoingToggle.setState(inResponse.synergvSyncOutgoing);
 			if(inResponse.synergvMarkReadOnSync !== undefined)
@@ -43,6 +47,9 @@ enyo.kind({
 			if(inResponse.synergvSyncTime !== undefined) {
 			    this.$.SyncTimeSlider.setPosition(inResponse.synergvSyncTime);
 				this.$.SyncTimeCaption.setContent(inResponse.synergvSyncTime + " minute" + (inResponse.synergvSyncTime != 1 ? "s" : ""));
+			}
+			if(inResponse.synergvSyncPlacedCalls !== undefined) {
+				this.$.SyncPlacedToggle.setState(inResponse.synergvSyncPlacedCalls);
 			}
 		}
 	},
@@ -77,7 +84,7 @@ enyo.kind({
 		{kind: "AccountsUI", name: "addAccountView", capability: "MESSAGING", onAccountsUI_Done: "addAccountsDone"},
 		{ name: "AccountsView", kind: "HFlexBox", components:
 			[
-				{ kind: "Scroller", flex: 1, components:
+				{ kind: "FadeScroller", flex: 1, components:
 					[
 						{ kind: "Control", className: "box-center", components:
 							[
@@ -148,7 +155,17 @@ enyo.kind({
 													]
 												},
 											]
-										}
+										},
+										{ kind: "Item", layoutKind: "VFlexLayout", components:
+											[
+												{ kind: "HFlexBox", align: "center", components:
+													[
+														{ content: "Sync Placed Calls to Messaging", flex: 1 },
+														{ name: "SyncPlacedToggle", kind: "ToggleButton", onChange: "toggleSetting", key: "synergvSyncPlacedCalls" },
+													]
+												},
+											]
+										},
 									]
 								},
 								
@@ -217,7 +234,7 @@ enyo.kind({
 		this.inherited(arguments);
 		if(this.parent.history && this.parent.history.length > 0)
 		    this.showBackButton();
-		this.$.Preferences.call({ keys: ["synergvSyncOutgoing", "synergvMarkReadOnSync", "synergvSyncTime" ] }, { method: "getPreferences" });
+		this.$.Preferences.call({ keys: ["synergvSyncOutgoing", "synergvMarkReadOnSync", "synergvSyncTime", "synergvSyncPlacedCalls" ] }, { method: "getPreferences" });
 	},
 	
 	signup: function() {

@@ -10,6 +10,7 @@ enyo.kind({
 		"onBack":"",
 	},
 	components: [
+		{ name: "BillingCredit", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "getBillingCredit", onSuccess: "billingCreditReceived", onFailure: "billingCreditFailed" },
 		{ name: "PlaceCall", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "startCall", onSuccess: "callStarted", onFailure: "callFailed" },
 		{ name: "EndCall", kind: "PalmService", service: "palm://com.ericblade.synergv.service", method: "cancelCall", onSuccess: "callEnded", onFailure: "callEndFailed" },
 		{ kind: "HFlexBox", flex: 1, components:
@@ -133,16 +134,41 @@ enyo.kind({
 						{ name: "PlaceCallButton", kind: "Button", caption: "Place Call", className: "enyo-button-affirmative", onclick: "placeOrEndCall" },
 					]
 				},
-				{ kind: "Spacer" },
+				{ kind: "Spacer" },				
 			]
 		},
 		{ kind: "Toolbar", components:
 			[
 				{ name: "BackButton", icon: "images/back.png", onclick: "doBack" },
+				{ kind: "Spacer" },
 				{ name: "RedialButton", caption: "Redial", onclick: "redial", disabled: true },
+				{ kind: "Spacer" },
+				{ kind: "Control", content: "Call Credit: ", style: "color: white;", },
+				{ name: "BillingCreditLabel", caption: "$0.00", onclick: "openBrowser" },
 			]
-		}
+		},
+		{ name: "BrowserPopup", kind: "ModalDialog", style: "position: fixed; top: 3%; left: 3%; width: 94%; height: 94%;", components:
+			[
+				{ kind: "PageHeader", components:
+					[
+						{ content: "Click " },
+						{ kind: "Button", caption: "Close Browser", onclick: "closeBrowser", },
+						{ content: "to return to SynerGV" },
+					]
+				},
+				{ content: "If the Purchase page does not open immediately, close this window and click the credit button again.", className: "enyo-item-ternary" },
+				{ name: "Browser", style: "height: 580px; width: 100%;", kind: "WebView", url: "https://www.google.com/voice/#billing" },
+			]
+		},
     ],
+	openBrowser: function() {
+		this.$.BrowserPopup.open();
+		this.$.Browser.setUrl("https://www.google.com/voice/#billing");
+	},
+	closeBrowser: function() {
+		this.$.BrowserPopup.close();
+		this.render();
+	},
 	// TODO: should we keep track of call history? i guess there's a "Placed" button for that. We could theoretically load Placed, Received, Missed together .. hmm
 	redial: function() {
 		if(this.lastNumberCalled) {
@@ -237,5 +263,20 @@ enyo.kind({
 		this.$.toInput.setValue(str.substring(0, str.length-1));
 		inEvent.stopPropagation();
 		return true;
+	},
+	rendered: function() {
+		this.inherited(arguments);
+		if(enyo.application.accountId)
+			this.$.BillingCredit.call({ accountId: enyo.application.accountId });
+	},
+	billingCreditReceived: function(inSender, inResponse, inRequest) {
+		//this.log("billing credit=", JSON.stringify(inResponse.credit));
+		//if(this.$.BillingCreditLabel.setContent)
+		//	this.$.BillingCreditLabel.setContent(inResponse.credit.formattedCredit);
+		//else if(this.$.BillingCreditLabel.setCaption)
+		this.$.BillingCreditLabel.setCaption(inResponse.credit.formattedCredit);
+	},
+	billingCreditFailed: function(inSender, inError, inRequest) {
+		this.log(inError);
 	}
 });

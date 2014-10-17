@@ -41,7 +41,9 @@
 				{ "name": "startCall", "assistant": "startCall", "public": true },
 				{ "name": "cancelCall", "assistant": "cancelCall", "public": true },
 				{ "name": "editGeneralSettings", "assistant": "editGeneralSettings", "public": true },
-				{ "name": "setMessageFlag", "assistant": "setMessageFlag", "public": true }
+				{ "name": "setMessageFlag", "assistant": "setMessageFlag", "public": true },
+				{ "name": "getBillingCredit", "assistant": "getBillingCredit", "public": true },
+				{ "name": "setContactInfo", "assistant": "setContactInfo", "public": true }
 			]
         }
     ]
