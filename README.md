@@ -35,7 +35,7 @@ any license agreements for any modules that are used.
 ** PLEASE keep in mind that Open Source projects work best for everyone when you
 actively contribute!  Pull Requests and Gerrithub Code Review requests are welcome!
 
-Original SynerGV 2 code through the initial commit to this repository is Copyright 2011 - 2014, Eric Blade.
+Original SynerGV 2 code through the initial commit to this repository is Copyright 2011 - 2014, Eric Blade. All additional code that is not mentioned below, is copyright the author of that code. All contributions to this code are considered to be released under the terms of the LICENSE file here.
 
 The node library "gvhttps" is Copyright 2012-2014, Eric Blade, and falls under the SynerGV license.
 
