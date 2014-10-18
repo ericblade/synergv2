@@ -35,21 +35,31 @@ any license agreements for any modules that are used.
 ** PLEASE keep in mind that Open Source projects work best for everyone when you
 actively contribute!  Pull Requests and Gerrithub Code Review requests are welcome!
 
-Original SynerGV 1 code through the initial commit to this repository is
-Copyright 2011 - 2014, Eric Blade.
+Original SynerGV 2 code through the initial commit to this repository is Copyright 2011 - 2014, Eric Blade.
+
 The node library "gvhttps" is Copyright 2012-2014, Eric Blade, and falls under the SynerGV license.
+
 The SynerGV icon is Copyright iconshock.com.
+
 The search icon is Copyright Oxygen Team.
+
 Additional graphics and Icons are copyright Asle Hoeg-Mikkelsen.
+
 node-google-voice is copyright Alexander Stetsyuk.
+
 node-googleclientlogin by Segment ( https://github.com/segmentio )
+
 node jsdom is Copyright (c) 2010 Elijah Insua
+
 node request is by Mikeal Rogers ( https://github.com/mikeal )
+
 node websocket-client is Copyright (c) 2010, Peter Griess <pg@std.in>
+
 node xml2js is by Marek Kubica ( https://github.com/Leonidas-from-XIV )
 
+**
 This repo is available at gerrithub!  Visit gerrithub.io, and search for the
-project "ericblade/synergv1", or simply search "ericblade" for all of my public
+project "ericblade/synergv2", or simply search "ericblade" for all of my public
 source code.
 
 More information about gerrithub is available here:
