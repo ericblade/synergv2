@@ -73,7 +73,6 @@ enyo.kind({
 			Load up the Contacts app and make sure that all your Google Voice contacts are associated to the correct people -- sometimes \
 			Contact Merging isn't as bright as we'd like it to be.<p>\
 			Do some of your contacts have numbers instead of names?  Go to the Google Contacts site, and make sure that those contacts have actual names entered - Google Voice doesn't transmit names for contacts that only have Nicknames or Company Names.<p>\
-			Want your messages faster? Try the 'Boxcar Notifications' option on the Menu. But please make sure you read the information on that page. :)<p>\
 			Want to send a message to one of your Google Voice contacts? You should be able to \
 			locate them in Just Type or the webOS Contacts app, then click on the 'IM' box next to their \
 			Google Voice contact number (not their main phone number)<p>\
@@ -1087,7 +1086,7 @@ enyo.kind({
 		{ kind: "AppMenu", lazy: false, components:
 			[
 				{ caption: "About", onclick: "openAbout" },
-				{ caption: "Boxcar Notification", onclick: "openBoxCarView" },
+				//{ caption: "Boxcar Notification", onclick: "openBoxCarView" },
 				{ caption: "Preferences & Accounts", onclick: "selectAccountsView" },
 				{ caption: "Sync List to Messaging", onclick: "syncList" },				
 				{ name: "DirectConnectMenu", kind: "MenuCheckItem", caption: "Ask For Incoming Caller Name", onclick: "toggleSetting", settingName: "directConnect" },
@@ -1116,7 +1115,7 @@ enyo.kind({
 				{ name: "AccountsView", kind: "AccountsView",
 					onSelectedAccount: "accountSelected" },
 				{ name: "MainView", kind: "MainView", onSettingsReceived: "settingsReceived", onSetPages: "setPages", onSetBox: "setBox", onBack: "mainBack" },
-				{ name: "BoxCarView", kind: "BoxCarView", onBack: "goBack", className: "box-center", },
+				//{ name: "BoxCarView", kind: "BoxCarView", onBack: "goBack", className: "box-center", },
 			]
 		},
 		{ name: "BrowserPopup", kind: "ModalDialog", style: "position: fixed; top: 3%; left: 3%; width: 94%; height: 94%;", components:
@@ -1198,8 +1197,10 @@ enyo.kind({
 		this.$.MainPane.back();
 	},
 	openBoxCarView: function(inSender, inEvent) {
+/*
 		this.$.MainPane.selectViewByName("BoxCarView");
 		this.$.BoxCarView.render();
+*/
 	},
 	settingsReceived: function() {
 		var set = enyo.application.settings.settings;
@@ -1463,6 +1464,7 @@ enyo.kind({
 	}
 });
 
+/*
 enyo.kind({
 	name: "BoxCarView",
 	kind: "VFlexBox",
@@ -1542,6 +1544,7 @@ enyo.kind({
 		if(inPrefs.synergvBoxcarPassword !== undefined) this.$.BoxcarPassword.setValue(inPrefs.synergvBoxcarPassword);
 	}
 });
+*/
 
 enyo.kind({
 	name: "TestTransition",

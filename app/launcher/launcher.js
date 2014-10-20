@@ -23,6 +23,7 @@ enyo.kind({
     },
 	prefsReceived: function(inSender, inPrefs) {
 		this.log(inPrefs);
+/*
 		if(inPrefs.synergvBoxcarUsername !== undefined) this.boxcarUsername = inPrefs.synergvBoxcarUsername;
 		if(inPrefs.synergvBoxcarPassword !== undefined) this.boxcarPassword = inPrefs.synergvBoxcarPassword;
 		if( (!this.boxcarUsername || !this.boxcarPassword) && this.boxcarSocket)
@@ -31,6 +32,7 @@ enyo.kind({
 		} else if(this.boxcarUsername && this.boxcarPassword) {
 			this.$.BoxcarLogin.call({ username: this.boxcarUsername, password: this.boxcarPassword, api_key: "WJgcS7XCHZjoJiTZsgPo" });
 		}
+*/
 	},
     processWindowParams: function(params) {
         switch(params.cmd) {
@@ -73,6 +75,7 @@ enyo.kind({
 	appUnloaded: function() {
 		this.log("SynerGV app shutting down...");
 		this.shuttingDown = true;
+/*
 		if(this.boxcarSocket) {
 			this.log("socket status=", this.boxcarSocket.readyState);
 			//this.boxcarSocket.send("wtf");
@@ -82,16 +85,18 @@ enyo.kind({
 			this.boxcarSocket.close();
 		}
 		this.boxcarSocket = undefined;
+*/
 		this.log("ready to close");
 	},
 	connectBoxcar: function() {
+/*
 		this.log();
 		if(!this.boxcarUsername || !this.boxcarPassword || !this.boxcarToken) {
 			this.log("no boxcar credentials supplied, bailing");
 			return;
 		}
 		this.log("******************** connecting to socket ********************* ");
-		this.boxcarSocket = /*new WebSocket("ws://127.0.0.1/websocket");*/ new WebSocket("ws://farm.boxcar.io:8080/websocket");
+		this.boxcarSocket = new WebSocket("ws://farm.boxcar.io:8080/websocket");
 
 		if(this.socketTimer)
 		{
@@ -122,21 +127,23 @@ enyo.kind({
 			setTimeout(enyo.bind(this, this.connectBoxcar), 2000);
 			//this.connectBoxcar();
 		}), 30000);
-			/*this.socketInterval = setInterval(enyo.bind(this, function() {
-				this.log("boxcarSocket state=", this.boxcarSocket.readyState);
-			}), 5000);*/
+			//this.socketInterval = setInterval(enyo.bind(this, function() {
+			//	this.log("boxcarSocket state=", this.boxcarSocket.readyState);
+			//}), 5000);
 
 		this.boxcarSocket.onopen = enyo.bind(this, this.socketOpen);
 		this.boxcarSocket.onerror = enyo.bind(this, this.socketError);
 		this.boxcarSocket.onclose = enyo.bind(this, this.socketClose);
 		this.boxcarSocket.onmessage = enyo.bind(this, this.socketMessage);
-
+*/
 	},
 	boxcarLoginFailure: function(inSender, inError, inRequest) {
+/*
 		this.log("boxcarLoginFailure: ", inError);
 		// {"error_code":500,"error_message":"Incorrect username or password"}
 		// TODO: open an error box explaining the error_message
 		this.boxcarToken = undefined;
+*/
 	},
 	subscribeSuccess: function(inSender, inResponse, inRequest) {
 		this.log("subscribe success: ", inResponse);
@@ -163,7 +170,7 @@ enyo.kind({
             //enyo.windows.addBannerMessage("GVoice: "+enabled, '{}', "images/google-voice-icon24.png", "")
             if(this.Online && !this.shuttingDown)
             {
-				this.connectBoxcar();
+				//this.connectBoxcar();
 				if(!this.noWindowLaunch) {
 					this.$.SyncAllAccounts.call({ });
 				} else {
@@ -175,6 +182,7 @@ enyo.kind({
     },
 	socketOpen: function(inEvent) {
 		this.log("socket opened ", inEvent);
+/*
 		this.boxcarSocket.send('{"access_token":"' + this.boxcarToken + '"}');
 
 		var oldDash = this.boxcarDash;
@@ -198,14 +206,17 @@ enyo.kind({
 		if(this.socketTimer) {
 			clearTimeout(this.socketTimer);
 		}
+*/
 	},
 	socketError: function(inEvent) {
 		this.log("socket error ", inEvent);
+/*
 		if(this.boxcarDash)
 		    this.boxcarDash.destroy();
 		if(this.boxcarConnectingDash)
 		    this.boxcarConnectingDash.destroy();
 		this.boxcarDash = this.boxcarConnectingDash = undefined;
+*/
 	},
 	socketClose: function(inEvent) {
 		this.log("socket closed ", inEvent);
@@ -213,6 +224,7 @@ enyo.kind({
 			this.boxcarDash.destroy();
 			this.boxcarDash = undefined;
 		}*/
+/*
 		if(this.Online && !this.shuttingDown && this.boxcarUsername && this.boxcarPassword) {
 			// attempt reconnect, in case we just lost connection, it should tell us if our
 			// token has expired there. If it has, then that function should throw a message,
@@ -220,6 +232,7 @@ enyo.kind({
 			setTimeout(enyo.bind(this, this.connectBoxcar), 2000);
 			//this.connectBoxcar();
 		}
+*/
 	},
 // {"code":200,"message":"success","badge_count":48}
 //
@@ -240,6 +253,7 @@ enyo.kind({
 
 	socketMessage: function(inEvent) {
 		this.log("socket received message ", inEvent);
+/*
 		var data = JSON.parse(inEvent.data);
 		this.log("message data=", data);
 		switch(data.code) {
@@ -254,5 +268,6 @@ enyo.kind({
 					this.$.SyncAllAccounts.call({ });
 				}
 		}
+*/
 	}
 });
