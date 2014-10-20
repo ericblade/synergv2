@@ -64,3 +64,42 @@ source code.
 
 More information about gerrithub is available here:
 https://www.youtube.com/watch?v=jeWTvDad6VM
+
+=== To run in Chrome ===
+
+(Windows) Create a new shortcut on your desktop to Chrome.  Edit that shortcut, and add "--disable-web-security" to the Target.
+Example: "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" --disable-web-security
+
+(Unix) run google-chrome --disable-web-security or chromium --disable-web-security (depending on wether you are using chrome or chromium)
+
+(Mac/others) I don't use a Mac, but you should be able to adapt the above instructions.
+
+This might work in Opera, if Opera 20+ supports the --disable-web-security command.
+
+Do NOT use the disable-web-security switch for active browsing!!! Only use it when working with known good files.
+
+Use that shortcut, and load the "index.html" in the repo into your Chrome window, such as:
+file:///D:/src/synergv2/app/index-chrome.html
+
+=== Deploying to webOS ===
+
+Update the version number in app/appinfo.json and package/packageinfo.json, then run one of these bat files:
+pack.bat -- to create an ipk file
+inst.bat -- to create an ipk file and deploy it to a device
+dist.bat -- to create an ipk file, deploy it to device, and run the app.
+
+=== Deploying to other systems ===
+
+Don't even think about trying it with this one.  You want "synergv1".  This repo contains a whole ton
+of webOS specific code.
+
+=== Potential issues ===
+When running it in Chrome, it asks you to run Java.  If I remember correctly, Java is only necessary
+if you are attempting to use the built-in Enyo bridge to actually communciate with a live device
+that has a luna-service bus.  I don't think this ever actually worked, or if it did, I never figured
+out how to get it working.
+
+When running it in Chrome, it may stick at "Loading Accounts..." with a spinner that spins. (what else
+did you expect a spinner would do?)  I'm looking into this.  This may have to do with the Java thing,
+but I thought we were disabling that, and forcing it to specifically use the "mock" service data files.
+If anyone has a solution, please submit a code review/pull request!
